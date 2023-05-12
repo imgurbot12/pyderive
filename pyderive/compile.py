@@ -3,7 +3,7 @@ DataClass Compiler Utilities
 """
 from reprlib import recursive_repr
 from types import FunctionType
-from typing import Type, List, Optional, Any, Callable
+from typing import Type, List, Optional, Any, Callable, Dict
 
 from .abc import *
 
@@ -109,8 +109,8 @@ def create_init(
     :return:          generated init-function made from specifications
     """
     self_name = 'self'
-    locals    = {}
-    globals   = {HDF_VAR: HDF}
+    locals:  Dict[str, Any] = {}
+    globals: Dict[str, Any] = {HDF_VAR: HDF}
     args, post, body, kwonly = ['self'], [], [], []
     for field in fields:
         # build parameter code
@@ -231,7 +231,7 @@ def add_slots(cls: Type, fields: Fields, frozen: bool = False) -> Type:
         cls_dict.pop(name, None)
     # recreate class object w/ slots
     qname = getattr(cls, '__qualname__', None)
-    cls   = type(cls)(cls.__name__, cls.__bases__, cls_dict)
+    cls   = type(cls)(cls.__name__, cls.__bases__, cls_dict) #type: ignore
     if qname is not None:
         cls.__qualname__ = qname
     # implement custom state functions when frozen to enable proper pickling

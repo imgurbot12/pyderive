@@ -25,9 +25,6 @@ __all__ = [
 #: dataclass fields attribute
 FIELD_ATTR = '__derive_datafields__'
 
-#: type alias for dataclass converter function
-T = TypeVar('T')
-
 #: type for type-alias
 TypeT = Type[T]
 
@@ -63,11 +60,11 @@ HASH_ACTIONS: Dict[Tuple[bool, bool, bool, bool], Any] = {
 
 #** Functions **#
 
-def field(*_, **kwargs) -> Field:
+def field(*_, **kwargs) -> Any:
     """
     specify field configurations for a dataclass attribute
     """
-    return Field(MISSING, MISSING, **kwargs) #type: ignore
+    return Field('', MISSING, **kwargs)
 
 def is_dataclass(cls) -> bool:
     """
@@ -140,12 +137,13 @@ def _process_class(
     kw_only:     bool = False,
     slots:       bool = False,
     recurse:     bool = False,
+    field:       Type[FieldDef] = Field,
 ) -> TypeT:
     # valdiate settings
     if order and not eq:
         raise ValueError('eq must be true if order is true')
     # parse and conregate fields
-    struct = parse_fields(cls, recurse=recurse)
+    struct = parse_fields(cls, factory=field, recurse=recurse)
     fields = flatten_fields(struct)
     freeze = frozen or any(f.frozen for f in fields)
     # assign fields to dataclass
@@ -207,6 +205,7 @@ def dataclass(*,
     kw_only:     bool = False,
     slots:       bool = False,
     recurse:     bool = False,
+    field:       Type[FieldDef] = Field,
 ) -> DataFunc:
     ...
 
@@ -225,6 +224,7 @@ def dataclass(cls: Optional[TypeT] = None, *_, **kw) -> Union[TypeT, DataFunc]:
     :param kw_only:     fields are keyword-only
     :param slots:       enable slots generation
     :param recurse:     recursively search and compile fields from base-classes
+    :param field:       field-factory baseclass
     :return:            dataclass type object
     """
     @dataclass_transform(field_specifiers=(FieldDef, Field, field))

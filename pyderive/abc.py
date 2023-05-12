@@ -6,22 +6,12 @@ from enum import IntEnum
 from typing import *
 from typing_extensions import Self, runtime_checkable
 
-#: import MISSING type from dataclasses for compatability if available
-try:
-    from dataclasses import MISSING, InitVar, FrozenInstanceError #type: ignore
-except ModuleNotFoundError:
-    class MISSING: #type: ignore
-        pass
-    class _InitVarMeta(type):
-        def __getitem__(self, _):
-            return self
-    class InitVar(metaclass=_InitVarMeta): #type: ignore
-        pass
-    class FrozenInstanceError(AttributeError): #type: ignore
-        pass
-
 #** Variables **#
 __all__ = [
+    'T',
+    'MISSING',
+    'InitVar',
+    'FrozenInstanceError',
     'Fields',
     'DefaultFactory',
     'FieldType',
@@ -29,20 +19,31 @@ __all__ = [
     'Field',
     'FlatStruct',
     'ClassStruct',
-    # exports
-    'ClassVar',
-    'InitVar', 
-    'MISSING',
-    'FrozenInstanceError'
 ]
+
+#: generic typevar
+T = TypeVar('T')
 
 #: type definition for a list of fields
 Fields = List['FieldDef']
 
 #: callable factory type hint
-DefaultFactory = Union[MISSING, Callable[[], Any]]
+DefaultFactory = Union['MISSING', None, Callable[[], Any]]
 
 #** Classes **#
+
+class MISSING:
+    pass
+
+class InitVar(Generic[T]):
+    __slots__ = ('type', )
+    def __init__(self, type):
+        self.type = type
+    def __class_getitem__(cls, type):
+        return cls(type)
+
+class FrozenInstanceError(AttributeError):
+    pass
 
 class FieldType(IntEnum):
     STANDARD = 1
@@ -52,15 +53,15 @@ class FieldType(IntEnum):
 class FieldDef(Protocol):
     name:            str
     anno:            Type
-    default:         Any
-    default_factory: DefaultFactory
-    init:            bool
-    repr:            bool
-    hash:            bool
-    compare:         bool
-    kw_only:         bool
-    frozen:          bool
-    field_type:      FieldType
+    default:         Any            = MISSING
+    default_factory: DefaultFactory = MISSING
+    init:            bool           = True
+    repr:            bool           = True
+    hash:            bool           = True
+    compare:         bool           = True
+    kw_only:         bool           = False
+    frozen:          bool           = False
+    field_type:      FieldType      = FieldType.STANDARD
     
     @abstractmethod
     def __init__(self, name: str, anno: Type, default: Any = MISSING):

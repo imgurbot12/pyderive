@@ -1,7 +1,7 @@
 """
 DataClass Parsing Tools
 """
-from typing import Type, Optional, get_origin
+from typing import Type, Optional, ClassVar, get_origin
 
 from .abc import *
 
@@ -37,7 +37,8 @@ def parse_fields(
     cls:     Type,
     factory: Type[FieldDef] = Field,
     recurse: bool           = True, 
-    delete:  bool           = True
+    delete:  bool           = True,
+    strict:  bool           = True,
 ) -> ClassStruct:
     """
     parse field definitions from class and delete values if allowed
@@ -46,11 +47,13 @@ def parse_fields(
     :param factory: field type factory used to produce fields
     :param recurse: enable recursive handling of field parsing if true
     :param delete:  delete values from class when found if true
+    :param strict:  be strict on factory field type during parsing
     :return:        unprocessed dataclass field definitions
     """
     global COMPILED
     bases  = list(cls.__mro__) if recurse else [cls]
     fields = None
+    ftype: Type[FieldDef] = factory if strict else FieldDef #type: ignore
     while bases:
         # skip builtin bases
         base = bases.pop()
@@ -77,10 +80,15 @@ def parse_fields(
             if name not in fields.order:
                 fields.order.append(name)
             # assign field based on value
-            if isinstance(default, FieldDef):
+            if isinstance(default, ftype):
                 field      = default
                 field.name = name
                 field.anno = anno
+            elif isinstance(default, FieldDef):
+                fclass = type(default).__name__
+                fallow = ftype.__name__
+                raise TypeError(
+                    f'unsupported field-type {fclass!r}. must use {fallow!r}')
             else:
                 field = factory(name, anno, default)
             # handle InitVar
@@ -125,12 +133,13 @@ def flatten_fields(
             field   = fields.fields[name]
             default = has_default(field)
             kwargs  = kwargs or default
+            missing = name not in struct.fields
             # raise error if non-kwarg found after kwargs start
-            if order_kw and kwargs and not default:
+            if order_kw and kwargs and missing and not default:
                 raise TypeError(
                     f'non-default argument {name!r} follows default argument')
             # append vardef to order and set/replace definition
-            if name not in struct.fields:
+            if missing:
                 struct.order.append(name)
             struct.fields[name] = field
     return struct.ordered_fields()

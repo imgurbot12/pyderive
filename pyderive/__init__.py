@@ -4,6 +4,8 @@ Custom DataClass Compilation Helpers
 
 #** Variables **#
 __all__ = [
+    'InitVar',
+    'FrozenInstanceError',
     'Fields',
     'DefaultFactory',
     'FieldType',
@@ -11,10 +13,6 @@ __all__ = [
     'Field',
     'FlatStruct',
     'ClassStruct',
-    'ClassVar',
-    'InitVar', 
-    'MISSING',
-    'FrozenInstanceError',
 
     'remove_field',
     'parse_fields',
@@ -33,6 +31,11 @@ __all__ = [
     'fields',
     'asdict',
     'dataclass',
+ 
+    # compat exports
+    'InitVar',
+    'MISSING',
+    'FrozenInstanceError',
 ]
 
 #** Imports **#
