@@ -23,7 +23,10 @@ __all__ = [
 ]
 
 #: dataclass fields attribute
-FIELD_ATTR = '__derive_datafields__'
+FIELD_ATTR = '__datafields__'
+
+#: field generic type
+F = TypeVar('F', bound=FieldDef)
 
 #: type for type-alias
 TypeT = Type[T]
@@ -58,6 +61,9 @@ HASH_ACTIONS: Dict[Tuple[bool, bool, bool, bool], Any] = {
     (True,  True,  True,  True ): _hash_err,
 }
 
+class DataClassLike(Generic[F], Protocol):
+    __datafields__: List[F]
+
 #** Functions **#
 
 def field(*_, **kwargs) -> Any:
@@ -75,7 +81,15 @@ def is_dataclass(cls) -> bool:
     """
     return hasattr(cls, FIELD_ATTR)
 
-def fields(cls) -> List[Field]:
+@overload
+def fields(cls: Any) -> List[FieldDef]:
+    ...
+
+@overload
+def fields(cls: DataClassLike[F]) -> List[F]:
+    ...
+
+def fields(cls: Union[DataClassLike[F], Any]) -> List[F]:
     """
     retrieve fields associated w/ the given dataclass
 
@@ -113,7 +127,7 @@ def _asdict_inner(obj, rec: int, factory: Type[dict], lvl: int):
     else:
         return copy.deepcopy(obj) 
 
-def asdict(cls, *, recurse: int = 0, dict_factory: Type[dict]=dict) -> dict:
+def asdict(cls, *, recurse: int = 0, dict_factory: Type[dict] = dict) -> dict:
     """
     convert dataclass object into dictionary of field-values
 
@@ -190,7 +204,19 @@ def _process_class(
 
 @overload
 @dataclass_transform(field_specifiers=(FieldDef, Field, field))
-def dataclass(cls: Type[T]) -> Type[T]:
+def dataclass(cls: Type[T], 
+    init:        bool = True,
+    repr:        bool = True,
+    eq:          bool = True,
+    order:       bool = False,
+    unsafe_hash: bool = False,
+    frozen:      bool = False,
+    match_args:  bool = True,
+    kw_only:     bool = False,
+    slots:       bool = False,
+    recurse:     bool = False,
+    field:       Type[FieldDef] = Field,
+) -> Type[T]:
     ...
 
 @overload
