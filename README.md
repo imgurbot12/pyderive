@@ -3,6 +3,12 @@ pyderive
 
 Python3 Custom Dataclass Helpers
 
+### Installation
+
+```bash
+pip install pyderive3
+```
+
 ### Features
 
 ##### Expanded Reimplementation of Dataclasses
