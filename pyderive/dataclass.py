@@ -14,7 +14,8 @@ from .compile import *
 __all__ = [
     'InitVar', 
     'MISSING', 
-    
+    'DataClassLike',
+ 
     'is_dataclass',
     'field', 
     'fields',
@@ -62,6 +63,7 @@ HASH_ACTIONS: Dict[Tuple[bool, bool, bool, bool], Any] = {
 }
 
 class DataClassLike(Generic[F], Protocol):
+    """Protocol for DataClass-Like Objects"""
     __datafields__: List[F]
 
 #** Functions **#
@@ -89,7 +91,7 @@ def fields(cls: Any) -> List[FieldDef]:
 def fields(cls: DataClassLike[F]) -> List[F]:
     ...
 
-def fields(cls: Union[DataClassLike[F], Any]) -> List[F]:
+def fields(cls: Union[DataClassLike[F], Any]) -> Union[List[F], List[FieldDef]]:
     """
     retrieve fields associated w/ the given dataclass
 

@@ -1,6 +1,12 @@
 """
 Custom DataClass Compilation Helpers
 """
+from typing import Type, Any
+
+from .abc import *
+from .parse import *
+from .compile import *
+from .dataclass import *
 
 #** Variables **#
 __all__ = [
@@ -31,6 +37,9 @@ __all__ = [
     'fields',
     'asdict',
     'dataclass',
+    'DataClassLike',
+
+    'BaseField',
  
     # compat exports
     'InitVar',
@@ -38,8 +47,12 @@ __all__ = [
     'FrozenInstanceError',
 ]
 
-#** Imports **#
-from .abc import *
-from .parse import *
-from .compile import *
-from .dataclass import *
+#** Classes **#
+
+@dataclass(recurse=True)
+class BaseField(FieldDef):
+    """dataclass field instance w/ better defaults"""
+    name:            str            = ''
+    anno:            Type           = type
+    default:         Any            = field(default_factory=lambda: MISSING)
+    default_factory: DefaultFactory = field(default_factory=lambda: MISSING) 

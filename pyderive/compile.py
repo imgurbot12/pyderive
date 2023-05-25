@@ -97,7 +97,7 @@ def _init_assign(self_name: str, name: str, value: str, frozen: bool) -> str:
 def create_init(
     fields:    Fields,
     kw_only:   bool = False, 
-    post_init: bool = True,
+    post_init: bool = False,
     frozen:    bool = False,
 ) -> Callable:
     """
