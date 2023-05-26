@@ -4,7 +4,7 @@ DataClass stdlib recreation using existing helpers
 import abc
 import copy
 from typing import * 
-from typing_extensions import dataclass_transform
+from typing_extensions import dataclass_transform, runtime_checkable
 
 from .abc import *
 from .parse import *
@@ -62,6 +62,7 @@ HASH_ACTIONS: Dict[Tuple[bool, bool, bool, bool], Any] = {
     (True,  True,  True,  True ): _hash_err,
 }
 
+@runtime_checkable
 class DataClassLike(Generic[F], Protocol):
     """Protocol for DataClass-Like Objects"""
     __datafields__: List[F]
@@ -143,8 +144,8 @@ def asdict(cls, *, recurse: int = 0, dict_factory: Type[dict] = dict) -> dict:
 @dataclass_transform(field_specifiers=(FieldDef, Field, field))
 def _process_class(
     cls: TypeT,
-    init:        bool = True,
-    repr:        bool = True,
+    init:        Optional[bool] = None,
+    repr:        Optional[bool] = None,
     eq:          bool = True,
     order:       bool = False,
     unsafe_hash: bool = False,
@@ -165,11 +166,14 @@ def _process_class(
     # assign fields to dataclass
     setattr(cls, FIELD_ATTR, fields)
     # build functions
-    if init:
+    if init or init is None:
+        overwrite = init is True
         post_init = hasattr(cls, POST_INIT)
-        assign_func(cls, create_init(fields, kw_only, post_init, frozen))
-    if repr:
-        assign_func(cls, create_repr(fields))
+        initfunc  = create_init(fields, kw_only, post_init, frozen)
+        assign_func(cls, initfunc, overwrite=overwrite)
+    if repr or repr is None:
+        overwrite = repr is True
+        assign_func(cls, create_repr(fields), overwrite=overwrite)
     if eq:
         assign_func(cls, create_compare(fields, '__eq__', '=='))
     if order:
@@ -207,8 +211,8 @@ def _process_class(
 @overload
 @dataclass_transform(field_specifiers=(FieldDef, Field, field))
 def dataclass(cls: Type[T], 
-    init:        bool = True,
-    repr:        bool = True,
+    init:        Optional[bool] = None,
+    repr:        Optional[bool] = None,
     eq:          bool = True,
     order:       bool = False,
     unsafe_hash: bool = False,
@@ -223,8 +227,8 @@ def dataclass(cls: Type[T],
 
 @overload
 def dataclass(*,
-    init:        bool = True,
-    repr:        bool = True,
+    init:        Optional[bool] = None,
+    repr:        Optional[bool] = None,
     eq:          bool = True,
     order:       bool = False,
     unsafe_hash: bool = False,

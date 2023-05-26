@@ -191,17 +191,19 @@ def create_hash(fields: Fields) -> Callable:
     names_t = _tuple_str(names, 'self')
     return _create_fn('__hash__', ['self'], [f'return hash({names_t})'])
 
-def assign_func(cls: Type, func: Callable, name: Optional[str] = None) -> bool:
+def assign_func(cls: Type, func: Callable, 
+    name: Optional[str] = None, overwrite: bool = False) -> bool:
     """
     assign function to the object and modify qualname
 
-    :param cls:  class object to assign to
-    :param func: function to assign to value
-    :param name: name of function to assign
-    :return:     true if object already exists else false
+    :param cls:       class object to assign to
+    :param func:      function to assign to value
+    :param name:      name of function to assign
+    :param overwrite: allow for overwrite if enabled
+    :return:          true if object already exists else false
     """
     name = name or func.__name__
-    if name in cls.__dict__:
+    if not overwrite and name in cls.__dict__:
         return True
     if isinstance(func, FunctionType):
         func.__qualname__ = f'{cls.__qualname__}.{func.__name__}'
