@@ -95,6 +95,8 @@ def parse_fields(
             if not isinstance(anno, type) and isinstance(anno, InitVar):
                 field.anno = anno.type
                 field.field_type = FieldType.INIT_VAR 
+            # finalize field build and assign to struct
+            field.finalize()
             fields.fields[name] = field
         # apply fields to baseclass to allow for inheritance
         if fields.fields:
@@ -132,7 +134,7 @@ def flatten_fields(
         for name in fields.order:
             field   = fields.fields[name]
             default = has_default(field)
-            kwargs  = kwargs or default
+            kwargs  = kwargs or (default and field.init and not field.kw_only)
             missing = name not in struct.fields
             # raise error if non-kwarg found after kwargs start
             if order_kw and kwargs and missing and not default:

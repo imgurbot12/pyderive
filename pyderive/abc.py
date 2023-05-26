@@ -62,10 +62,14 @@ class FieldDef(Protocol):
     kw_only:         bool           = False
     frozen:          bool           = False
     field_type:      FieldType      = FieldType.STANDARD
-    
+ 
     @abstractmethod
     def __init__(self, name: str, anno: Type, default: Any = MISSING):
         raise NotImplementedError
+
+    def finalize(self):
+        """run finalize when field variables are finished compiling"""
+        pass
 
 class Field(FieldDef):
 
