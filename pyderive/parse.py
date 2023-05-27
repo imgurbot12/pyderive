@@ -68,14 +68,14 @@ def parse_fields(
         fields      = ClassStruct(parent=parent)
         annotations = getattr(base, '__annotations__', {})
         for name, anno in annotations.items():
-            # retrieve default-value of variable (if exists)
-            default = getattr(base, name, MISSING)
-            if delete and hasattr(base, name):
-                delattr(base, name)
             # handle ClassVar
             if get_origin(anno) is ClassVar:
                 remove_field(fields, name)
                 continue
+            # retrieve default-value of variable (if exists)
+            default = getattr(base, name, MISSING)
+            if delete and hasattr(base, name):
+                delattr(base, name)
             # preserve order of fields and add vardef
             if name not in fields.order:
                 fields.order.append(name)
@@ -129,13 +129,16 @@ def flatten_fields(
         heigharchy.insert(0, fields)
     # sort fields
     struct = FlatStruct()
-    kwargs = False # track when kwargs have been spotted
+    kwargs = set() # track when kwargs have been spotted
     for fields in heigharchy:
         for name in fields.order:
             field   = fields.fields[name]
             default = has_default(field)
-            kwargs  = kwargs or (default and field.init and not field.kw_only)
             missing = name not in struct.fields
+            if default and field.init and not field.kw_only:
+                kwargs.add(name)
+            elif name in kwargs:
+                kwargs.remove(name)
             # raise error if non-kwarg found after kwargs start
             if order_kw and kwargs and missing and not default:
                 raise TypeError(
