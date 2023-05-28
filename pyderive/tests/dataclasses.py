@@ -79,3 +79,16 @@ class DataClassTests(unittest.TestCase):
         class Bar(Foo):
             b: int = field(default=1, frozen=True)
         self.assertRaises(TypeError, dataclass, Bar, frozen=True)
+
+    def test_asdict(self):
+        """ensure asdict function as intended"""
+        @dataclass
+        class Foo:
+            a: int = 0
+        @dataclass
+        class Bar:
+            foo: Foo
+            b:   int       = 1
+            c:   List[str] = field(default_factory=list)
+        b = Bar(Foo(1), 2)
+        self.assertDictEqual(asdict(b), {'foo': {'a': 1}, 'b': 2, 'c': []})
