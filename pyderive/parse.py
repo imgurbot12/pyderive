@@ -4,6 +4,7 @@ DataClass Parsing Tools
 from typing import Type, Optional, ClassVar, get_origin
 
 from .abc import *
+from .compat import is_stddataclass, convert_fields
 
 #** Variables **#
 __all__ = [
@@ -63,8 +64,13 @@ def parse_fields(
         if recurse and hash(base) in COMPILED:
             continue
         COMPILED.add(hash(base))
+        # convert stdlib dataclass fields to valid class-struct
+        parent = getattr(base, DERIVE_ATTR, None)
+        if parent is None and is_stddataclass(base):
+            fields = convert_fields(base, ftype)
+            names  = [f.name for f in fields]
+            parent = ClassStruct(names, {f.name:f for f in fields})
         # process fields
-        parent      = getattr(base, DERIVE_ATTR, None)
         fields      = ClassStruct(parent=parent)
         annotations = getattr(base, '__annotations__', {})
         for name, anno in annotations.items():

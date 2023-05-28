@@ -3,7 +3,7 @@ DataClass Compiler Utilities
 """
 from reprlib import recursive_repr
 from types import FunctionType
-from typing import Type, List, Optional, Any, Callable, Dict
+from typing import Iterator, Type, List, Optional, Any, Callable, Dict
 
 from .abc import *
 
@@ -116,22 +116,23 @@ def create_init(
         # build parameter code
         name  = field.name
         param = _init_param(field)
-        if field.field_type == FieldType.INIT_VAR:
-            if field.default_factory is not MISSING:
-                raise TypeError(
-                    f'init field {name!r} cannot have a default factory')
-            post.append(name)
         if field.init:
             if kw_only or field.kw_only:
                 kwonly.append(param)
             else:
                 args.append(param)
+        if field.field_type == FieldType.INIT_VAR:
+            if field.default_factory is not MISSING:
+                raise TypeError(
+                    f'init field {name!r} cannot have a default factory')
+            post.append(name)
+            continue
         # build body code
         value  = _init_value(field, globals)
         assign = _init_assign(self_name, name, value, frozen or field.frozen)
         body.append(assign)
     # ensure body exists
-    if post_init or post:
+    if post_init:
         params = ', '.join(post)
         body.append(f'self.{POST_INIT}({params})')
     if not body:
@@ -142,6 +143,10 @@ def create_init(
         args.extend(kwonly)
     return _create_fn('__init__', args, body, locals, globals)
 
+def _stdfields(fields: Fields) -> Iterator[FieldDef]:
+    """retrieve only standard fields from fields-list"""
+    return (f for f in fields if f.field_type == FieldType.STANDARD)
+
 def create_repr(fields: Fields) -> Callable:
     """
     generate simple repr-function for the following field-structure
@@ -149,7 +154,7 @@ def create_repr(fields: Fields) -> Callable:
     :param fields: ordered field used to generate repr-func
     :param return: repr-function
     """
-    names = [f.name for f in fields if f.repr] 
+    names = [f.name for f in _stdfields(fields) if f.repr]
     body  = 'return self.__class__.__qualname__ + f"(' + \
         ', '.join(f'{name}={{self.{name}!r}}' for name in names) + ')"'
     func = _create_fn('__repr__', ['self'], [body])
@@ -171,7 +176,7 @@ def create_compare(fields: Fields, func: str, op: str) -> Callable:
     :param op:     function compare operation
     :return:       compare-function
     """
-    names  = [f.name for f in fields if f.compare]
+    names  = [f.name for f in _stdfields(fields) if f.compare]
     self_t  = _tuple_str(names, 'self') 
     other_t = _tuple_str(names, 'other')  
     return _create_fn(func, ['self', 'other'], [
@@ -187,7 +192,7 @@ def create_hash(fields: Fields) -> Callable:
     :param fields: ordered fields used to generate hash-function
     :return:       hash-function
     """
-    names   = [f.name for f in fields if f.hash]
+    names   = [f.name for f in _stdfields(fields) if f.hash]
     names_t = _tuple_str(names, 'self')
     return _create_fn('__hash__', ['self'], [f'return hash({names_t})'])
 
@@ -215,9 +220,10 @@ def add_slots(cls: Type, fields: Fields, frozen: bool = False) -> Type:
     generate slots for fields connected to the given class object
 
     :param cls:    class-object to assign slots onto
-    :param struct: field structure to control slot definition
+    :param fields: field structure to control slot definition
     :return:       updated class object
     """
+    fields   = list(_stdfields(fields))
     cls_dict = dict(cls.__dict__)
     if '__slots__' in cls_dict:
         raise TypeError(f'{cls.__name__} already specifies __slots__')
@@ -249,20 +255,16 @@ def add_slots(cls: Type, fields: Fields, frozen: bool = False) -> Type:
         assign_func(cls, setstate)
     return cls
 
-def freeze_fields(cls: Type, struct: FlatStruct, frozen: bool = False):
+def freeze_fields(cls: Type, fields: Fields, frozen: bool = False):
     """
     add custom __setattr__/__delattr__ funcs to prevent field modification
 
     :param cls:    class object to assign functions to
-    :param struct: field structure to control frozen status
+    :param fields: field structure to control frozen status
     :param frozen: override field frozen status
     """
-    fields = []
-    for name in struct.order:
-        field = struct.fields[name]
-        if frozen or field.frozen:
-            fields.append(repr(name))
-    names   = _tuple_str(fields)
+    fnames = [repr(f.name) for f in _stdfields(fields) if frozen or f.frozen]
+    names   = _tuple_str(fnames)
     globals = {'cls': cls, 'FrozenInstanceError': FrozenInstanceError}
     ifstmt  = f'if name in {names}:'
     setattr = _create_fn('__setattr__', ['self', 'name', 'value'], [

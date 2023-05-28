@@ -9,6 +9,7 @@ from typing_extensions import dataclass_transform, runtime_checkable
 from .abc import *
 from .parse import *
 from .compile import *
+from .compat import is_stddataclass, convert_params
 
 #** Variables **#
 __all__ = [
@@ -25,6 +26,9 @@ __all__ = [
 
 #: dataclass fields attribute
 FIELD_ATTR = '__datafields__'
+
+#: dataclas params attribute
+PARAMS_ATTR = '__dataparams__'
 
 #: field generic type
 F = TypeVar('F', bound=FieldDef)
@@ -62,10 +66,7 @@ HASH_ACTIONS: Dict[Tuple[bool, bool, bool, bool], Any] = {
     (True,  True,  True,  True ): _hash_err,
 }
 
-@runtime_checkable
-class DataClassLike(Generic[F], Protocol):
-    """Protocol for DataClass-Like Objects"""
-    __datafields__: List[F]
+
 
 #** Functions **#
 
@@ -89,10 +90,10 @@ def fields(cls: Any) -> List[FieldDef]:
     ...
 
 @overload
-def fields(cls: DataClassLike[F]) -> List[F]:
+def fields(cls: 'DataClassLike[F]') -> List[F]:
     ...
 
-def fields(cls: Union[DataClassLike[F], Any]) -> Union[List[F], List[FieldDef]]:
+def fields(cls):
     """
     retrieve fields associated w/ the given dataclass
 
@@ -159,12 +160,27 @@ def _process_class(
     # valdiate settings
     if order and not eq:
         raise ValueError('eq must be true if order is true')
+    # convert params for stdlib dataclasses
+    isdataclass = is_dataclass(cls)
+    if not isdataclass and is_stddataclass(cls):
+        convert_params(cls)
     # parse and conregate fields
     struct = parse_fields(cls, factory=field, recurse=recurse)
     fields = flatten_fields(struct)
     freeze = frozen or any(f.frozen for f in fields)
+    # validate settings and save fields/params
+    params = DataParams(init, repr, eq, order, unsafe_hash, 
+        frozen, match_args, kw_only, slots, recurse, field)
+    if isdataclass:
+        ofields = getattr(cls, FIELD_ATTR)
+        oparams = getattr(cls, PARAMS_ATTR)
+        # ensure there are not frozen conflicts
+        if frozen and not (oparams.frozen or all(f.frozen for f in ofields)):
+            raise TypeError(
+                'cannot inherit frozen dataclass from a non-frozen one')
     # assign fields to dataclass
     setattr(cls, FIELD_ATTR, fields)
+    setattr(cls, PARAMS_ATTR, params)
     # build functions
     if init or init is None:
         overwrite = init is True
@@ -186,7 +202,7 @@ def _process_class(
                                 f'in class {cls.__name__}. Consider '
                                 'using functools.total_ordering')
     if freeze:
-        freeze_fields(cls, struct, frozen)
+        freeze_fields(cls, fields, frozen)
     # build hash function based on current state
     class_dict  = cls.__dict__
     class_eq    = class_dict.get('__eq__', None)
@@ -263,3 +279,50 @@ def dataclass(cls: Optional[TypeT] = None, *_, **kw) -> Union[TypeT, DataFunc]:
     def wrapper(cls: TypeT) -> TypeT:
         return _process_class(cls, **kw)
     return wrapper if cls is None else wrapper(cls)
+
+#** Classes **#
+
+@runtime_checkable
+class DataClassLike(Generic[F], Protocol):
+    """Protocol for DataClass-Like Objects"""
+    __datafields__: List[F]
+
+class DataParams:
+    """Pseudo Dataclass to store parameters used to generate dataclass"""
+    __slots__ = (
+        'init', 
+        'repr',
+        'eq', 
+        'order', 
+        'unsafe_hash', 
+        'frozen', 
+        'match_args', 
+        'kw_only', 
+        'slots', 
+        'recurse', 
+        'field')
+
+    def __init__(self,
+        init:        Optional[bool],
+        repr:        Optional[bool],
+        eq:          bool,
+        order:       bool,
+        unsafe_hash: bool,
+        frozen:      bool,
+        match_args:  bool,
+        kw_only:     bool,
+        slots:       bool,
+        recurse:     bool,
+        field:       Type[FieldDef],
+    ):
+        self.init        = init
+        self.repr        = repr
+        self.eq          = eq
+        self.order       = order
+        self.unsafe_hash = unsafe_hash
+        self.frozen      = frozen
+        self.match_args  = match_args
+        self.kw_only     = kw_only
+        self.slots       = slots
+        self.recurse     = recurse
+        self.field       = field

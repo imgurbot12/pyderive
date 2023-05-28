@@ -7,9 +7,13 @@ from .abc import *
 from .parse import *
 from .compile import *
 from .dataclass import *
+from . import compat
 
 #** Variables **#
 __all__ = [
+    'compat',
+
+    'MISSING',
     'InitVar',
     'FrozenInstanceError',
     'Fields',
@@ -40,11 +44,6 @@ __all__ = [
     'DataClassLike',
 
     'BaseField',
- 
-    # compat exports
-    'InitVar',
-    'MISSING',
-    'FrozenInstanceError',
 ]
 
 #** Classes **#
