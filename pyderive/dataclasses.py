@@ -184,6 +184,10 @@ def _process_class(
         if not frozen and (oparams.frozen or any(f.frozen for f in ofields)):
             raise TypeError(
                 'cannot inherit non-frozen dataclass from a frozen one')
+    # ensure slots dont conflict with partially frozen dataclasses
+    if slots and not frozen and any(f.frozen for f in fields):
+        raise TypeError(
+            'cannot assign slots for partially frozen dataclass')
     # assign fields to dataclass
     setattr(cls, FIELD_ATTR, fields)
     setattr(cls, PARAMS_ATTR, params)

@@ -7,8 +7,6 @@ from typing import Iterator, Type, List, Optional, Any, Callable, Dict
 
 from .abc import *
 
-#TODO: slots when used with unslotted baseclass raises errors
-
 #** Variables **#
 __all__ = [
     'POST_INIT',
