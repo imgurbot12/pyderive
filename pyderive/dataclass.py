@@ -16,6 +16,7 @@ __all__ = [
     'InitVar', 
     'MISSING', 
     'DataClassLike',
+    'FrozenInstanceError',
  
     'is_dataclass',
     'field', 
@@ -176,10 +177,13 @@ def _process_class(
     if isdataclass:
         ofields = getattr(cls, FIELD_ATTR)
         oparams = getattr(cls, PARAMS_ATTR)
-        # ensure there are not frozen conflicts
+        # ensure there are no frozen conflicts
         if frozen and not (oparams.frozen or all(f.frozen for f in ofields)):
             raise TypeError(
                 'cannot inherit frozen dataclass from a non-frozen one')
+        if not frozen and (oparams.frozen or any(f.frozen for f in ofields)):
+            raise TypeError(
+                'cannot inherit non-frozen dataclass from a frozen one')
     # assign fields to dataclass
     setattr(cls, FIELD_ATTR, fields)
     setattr(cls, PARAMS_ATTR, params)
