@@ -116,6 +116,7 @@ def create_init(
         # build parameter code
         name  = field.name
         param = _init_param(field)
+        value = _init_value(field, globals)
         if field.init:
             if kw_only or field.kw_only:
                 kwonly.append(param)
@@ -128,7 +129,6 @@ def create_init(
             post.append(name)
             continue
         # build body code
-        value  = _init_value(field, globals)
         assign = _init_assign(self_name, name, value, frozen or field.frozen)
         body.append(assign)
     # ensure body exists

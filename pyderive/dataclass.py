@@ -66,8 +66,6 @@ HASH_ACTIONS: Dict[Tuple[bool, bool, bool, bool], Any] = {
     (True,  True,  True,  True ): _hash_err,
 }
 
-
-
 #** Functions **#
 
 def field(*_, **kwargs) -> Any:
@@ -86,23 +84,27 @@ def is_dataclass(cls) -> bool:
     return hasattr(cls, FIELD_ATTR)
 
 @overload
-def fields(cls: Any) -> List[FieldDef]:
+def fields(cls: Any, all_types: bool = False) -> List[FieldDef]:
     ...
 
 @overload
-def fields(cls: 'DataClassLike[F]') -> List[F]:
+def fields(cls: 'DataClassLike[F]', all_types: bool = False) -> List[F]:
     ...
 
-def fields(cls):
+def fields(cls, all_types: bool = False):
     """
     retrieve fields associated w/ the given dataclass
 
-    :param cls: dataclass object class instance
-    :return:    field dictionary
+    :param cls:       dataclass object class instance
+    :param all_types: return all field-types or just standard fields
+    :return:          field dictionary
     """
     if not is_dataclass(cls):
         raise TypeError('fields() should with a dataclass type or instance')
-    return getattr(cls, FIELD_ATTR)
+    fields = getattr(cls, FIELD_ATTR)
+    if not all_types:
+        fields = [f for f in fields if f.field_type == FieldType.STANDARD]
+    return fields
 
 def _asdict_inner(obj, rec: int, factory: Type[dict], lvl: int):
     """inner dictionary-ify function to convert dataclass fields into dict"""
