@@ -74,6 +74,41 @@ for f in fields(foo):
     print(f.name, f.custom_attr)
 ```
 
+###### Backwards Compatibility
+```python
+import pyderive
+import dataclasses
+
+@dataclasses.dataclass
+class Foo:
+    a: int
+    b: int = dataclasses.field(repr=False)
+
+@pyderive.dataclass
+class Bar(Foo):
+    c: int = pyderive.field(frozen=True)
+
+f = Bar(1, 2, 3)
+print(f)
+```
+
+###### Monkey Patching
+
+```python
+from pyderive import compat
+compat.monkey_patch()
+
+from dataclasses import dataclass, field
+
+@dataclass
+class Foo:
+    a: int
+    b: int = field(frozen=True)
+
+f = Foo(1, 2)
+print(f)
+```
+
 ##### Low Level Dataclass Compilation Tools
 
 ```python

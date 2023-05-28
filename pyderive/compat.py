@@ -2,6 +2,7 @@
 Stdlib Dataclass Compatability Utils
 """
 import sys
+import importlib
 from types import ModuleType
 from typing import Optional, Type
 
@@ -23,21 +24,15 @@ def monkey_patch():
     global stdlib_dataclasses
     # skip repeated monkey-patching if already converted
     stdlib = sys.modules.get(module_name)
-    if stdlib is not None and hasattr(stdlib, 'MONKEY'):
+    if stdlib and stdlib is stdlib_dataclasses:
         return
     # generate custom module to export dataclass replacements
-    from . import dataclass as derive
-    class DataclassMonkeyPatch(ModuleType):
-        MONKEY       = True
-        MISSING      = derive.MISSING
-        InitVar      = derive.InitVar
-        dataclass    = derive.dataclass
-        field        = derive.field
-        asdict       = derive.asdict
-        fields       = derive.fields
-        is_dataclass = derive.is_dataclass
-    stdlib_dataclasses = stdlib
-    sys.modules[module_name] = DataclassMonkeyPatch(module_name)
+    from . import dataclasses as derive
+    try:
+        stdlib_dataclasses = importlib.import_module(module_name)
+    except ImportError:
+        pass
+    sys.modules[module_name] = derive
 
 def is_stddataclass(cls) -> bool:
     """
@@ -85,7 +80,7 @@ def convert_fields(cls, field: Type[FieldDef]) -> Fields:
 
 def convert_params(cls):
     """convert dataclass params to the correct-type if a dataclass"""
-    from .dataclass import PARAMS_ATTR
+    from .dataclasses import PARAMS_ATTR
     # ensure type is dataclass or return
     dataclasses = stdlib_dataclasses or sys.modules.get(module_name)
     if not dataclasses:

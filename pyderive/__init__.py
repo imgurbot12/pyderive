@@ -6,7 +6,7 @@ from typing import Type, Any
 from .abc import *
 from .parse import *
 from .compile import *
-from .dataclass import *
+from .dataclasses import *
 from . import compat
 
 #** Variables **#

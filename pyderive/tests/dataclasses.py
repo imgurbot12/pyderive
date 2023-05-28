@@ -5,7 +5,7 @@ import unittest
 import dataclasses
 from typing import ClassVar, List
 
-from ..dataclass import *
+from ..dataclasses import *
 
 #** Variables **#
 __all__ = ['DataClassTests']
