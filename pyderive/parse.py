@@ -1,6 +1,7 @@
 """
 DataClass Parsing Tools
 """
+from types import MemberDescriptorType
 from typing import Type, Optional, ClassVar, get_origin
 
 from .abc import *
@@ -79,8 +80,10 @@ def parse_fields(
                 remove_field(fields, name)
                 continue
             # retrieve default-value of variable (if exists)
-            default = getattr(base, name, MISSING)
-            if delete and hasattr(base, name):
+            default     = getattr(base, name, MISSING)
+            member_desc = isinstance(default, MemberDescriptorType)
+            default     = MISSING if member_desc else default
+            if delete and hasattr(base, name) and not member_desc:
                 delattr(base, name)
             # preserve order of fields and add vardef
             if name not in fields.order:
@@ -146,7 +149,8 @@ def flatten_fields(
             elif name in kwargs:
                 kwargs.remove(name)
             # raise error if non-kwarg found after kwargs start
-            if order_kw and kwargs and missing and not default:
+            kwarg = not field.kw_only and kwargs
+            if order_kw and kwarg and missing and not default:
                 raise TypeError(
                     f'non-default argument {name!r} follows default argument')
             # append vardef to order and set/replace definition

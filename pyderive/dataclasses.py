@@ -231,7 +231,8 @@ def _process_class(
     if slots:
         cls = add_slots(cls, fields, freeze)
     # update abstraction-methods on re-creation and return
-    abc.update_abstractmethods(cls)
+    if hasattr(abc, 'update_abstractmethods'):
+        abc.update_abstractmethods(cls)
     return cls
 
 @overload
