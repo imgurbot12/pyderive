@@ -4,7 +4,8 @@ Stdlib Dataclass Compatability Utils
 import sys
 import importlib
 from types import ModuleType
-from typing import Optional, Type
+from typing import Dict, List, Optional, Set, Tuple, Type
+from typing_extensions import get_origin, get_args
 
 from .abc import MISSING, FieldDef, FieldType, Fields
 
@@ -22,6 +23,9 @@ module_name = 'dataclasses'
 
 #: preserved stdlib dataclass module for reference
 stdlib_dataclasses: Optional[ModuleType] = None
+
+#: origin annotation to valid annotation type
+ANNO_MAP = {list: List, set: Set, tuple: Tuple, type: Type, dict: Dict}
 
 #** Functions **#
 
@@ -113,6 +117,20 @@ def _import_std_dataclasses():
     dataclasses = dataclasses or importlib.import_module(module_name)
     return dataclasses
 
+def _convert_anno(anno: Type):
+    """convert annotation for valid stdlib dataclass"""
+    # convert pyderive dataclass
+    from .dataclasses import is_dataclass
+    if is_dataclass(anno):
+        return std_convert_dataclass(anno)
+    # parse through complex type annotations
+    origin = get_origin(anno)
+    if origin is None:
+        return anno
+    origin = ANNO_MAP.get(origin) or origin
+    args = tuple([_convert_anno(subanno) for subanno in get_args(anno)])
+    return origin[args] 
+
 def std_convert_fields(cls):
     """
     convert pyderive dataclass fields to stdlib dataclass fields
@@ -155,7 +173,7 @@ def std_convert_fields(cls):
             default_factory=_missing(field.default_factory),
         )
         stdfield.name = field.name
-        stdfield.type = field.anno
+        stdfield.type = _convert_anno(field.anno)
         stdfield._field_type = ftypes[field.field_type]
         if sys.version_info.minor >= 10:
             stdfield.kw_only = field.kw_only
@@ -199,4 +217,3 @@ def std_convert_dataclass(cls):
         })
     # finalize dataclass generation
     return dataclasses.make_dataclass(name, attrs, bases=bases, **kwargs)
-
