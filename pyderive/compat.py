@@ -1,6 +1,7 @@
 """
 Stdlib Dataclass Compatability Utils
 """
+from functools import lru_cache
 import sys
 import importlib
 from types import ModuleType
@@ -23,6 +24,9 @@ module_name = 'dataclasses'
 
 #: preserved stdlib dataclass module for reference
 stdlib_dataclasses: Optional[ModuleType] = None
+
+#: compiled to stdlib cache
+COMPILED_STDLIB = {}
 
 #: origin annotation to valid annotation type
 ANNO_MAP = {list: List, set: Set, tuple: Tuple, type: Type, dict: Dict}
@@ -177,9 +181,14 @@ def std_convert_fields(cls):
         stdfield._field_type = ftypes[field.field_type]
         if sys.version_info.minor >= 10:
             stdfield.kw_only = field.kw_only
+        # convert defaults to dataclasses if needed
+        if is_dataclass(stdfield.default_factory):
+            stdfield.default_factory = \
+                std_convert_dataclass(stdfield.default_factory)
         stdfields.append(stdfield)
     return stdfields
 
+@lru_cache(maxsize=int(1e10))
 def std_convert_dataclass(cls):
     """
     convert pyderive dataclass to stdlib dataclass for 3rd party compatability
@@ -216,4 +225,12 @@ def std_convert_dataclass(cls):
             'slots':      params.slots,
         })
     # finalize dataclass generation
-    return dataclasses.make_dataclass(name, attrs, bases=bases, **kwargs)
+    dataclass = dataclasses.make_dataclass(name, attrs, bases=bases, **kwargs)
+    # #NOTE: this magic resolves some seemingly random issues when passing 
+    # # dataclasses to other 3rd party libraries
+    @dataclasses.dataclass
+    class DataClass(dataclass):
+        pass
+    DataClass.__name__ = dataclass.__name__
+    DataClass.__qualname__ = dataclass.__qualname__
+    return DataClass

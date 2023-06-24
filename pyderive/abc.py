@@ -57,7 +57,7 @@ class FieldDef(Protocol):
     default_factory: DefaultFactory = MISSING
     init:            bool           = True
     repr:            bool           = True
-    hash:            bool           = True
+    hash:            Optional[bool] = None
     compare:         bool           = True
     kw_only:         bool           = False
     frozen:          bool           = False
@@ -80,7 +80,7 @@ class Field(FieldDef):
         default_factory: DefaultFactory = MISSING,
         init:            bool           = True,
         repr:            bool           = True,
-        hash:            bool           = True,
+        hash:            Optional[bool] = None,
         compare:         bool           = True,
         kw_only:         bool           = False,
         frozen:          bool           = False,

@@ -192,7 +192,8 @@ def create_hash(fields: Fields) -> Callable:
     :param fields: ordered fields used to generate hash-function
     :return:       hash-function
     """
-    names   = [f.name for f in _stdfields(fields) if f.hash]
+    names   = [f.name for f in _stdfields(fields) 
+        if (f.compare if f.hash is None else f.hash)]
     names_t = _tuple_str(names, 'self')
     return _create_fn('__hash__', ['self'], [f'return hash({names_t})'])
 
