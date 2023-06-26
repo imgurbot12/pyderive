@@ -218,7 +218,7 @@ def std_convert_dataclass(cls, **kwargs):
     kwargs.setdefault('frozen', params.frozen)
     if sys.version_info.minor >= 10:
         kwargs.setdefault('match_args', params.match_args)
-        kwargs.setdefault('kw_onky', params.kw_only)
+        kwargs.setdefault('kw_only', params.kw_only)
         kwargs.setdefault('slots', params.slots)
     # finalize dataclass generation
     dataclass = dataclasses.make_dataclass(name, attrs, bases=bases, **kwargs)
