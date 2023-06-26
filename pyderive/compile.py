@@ -3,7 +3,7 @@ DataClass Compiler Utilities
 """
 from reprlib import recursive_repr
 from types import FunctionType
-from typing import Iterator, Type, List, Optional, Any, Callable, Dict
+from typing import Iterator, Tuple, Type, List, Optional, Any, Callable, Dict
 
 from .abc import *
 
@@ -18,6 +18,7 @@ __all__ = [
     'create_compare',
     'create_hash',
     'assign_func',
+    'gen_slots',
     'add_slots',
     'freeze_fields',
 ]
@@ -182,7 +183,7 @@ def create_compare(fields: Fields, func: str, op: str) -> Callable:
     return _create_fn(func, ['self', 'other'], [
          'if other.__class__ is self.__class__:',
         f' return {self_t} {op} {other_t}',
-         'raise NotImplemented',
+         'return NotImplemented',
     ])
 
 def create_hash(fields: Fields) -> Callable:
@@ -216,12 +217,33 @@ def assign_func(cls: Type, func: Callable,
     setattr(cls, name, func)
     return False
 
-def add_slots(cls: Type, fields: Fields, frozen: bool = False) -> Type:
+def gen_slots(cls: Type, fields: Fields) -> Tuple[str, ...]:
     """
     generate slots for fields connected to the given class object
 
+    WARNING: gen-slots cannot be applied to already generated
+             class objects. only during evaluation by a meta-class
+             or something similar. WHEN UNSURE USE ADD_SLOTS INSTEAD
+
     :param cls:    class-object to assign slots onto
     :param fields: field structure to control slot definition
+    """
+    fields = list(_stdfields(fields))
+    if '__slots__' in cls.__dict__:
+        raise TypeError(f'{cls.__name__} already specifies __slots__')
+    # ensure slots don't overlap with bases-classes
+    slots      = [f.name for f in fields]
+    bases      = cls.__mro__[1:-1]
+    base_slots = {s for b in bases for s in getattr(b, '__slots__', [])}
+    return tuple([s for s in slots if s not in base_slots])
+
+def add_slots(cls: Type, fields: Fields, frozen: bool = False) -> Type:
+    """
+    attach slots for fields connected to the given class object
+
+    :param cls:    class-object to assign slots onto
+    :param fields: field structure to control slot definition
+    :param frozen: apply additional methods when handing a frozen object
     :return:       updated class object
     """
     fields   = list(_stdfields(fields))

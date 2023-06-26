@@ -33,6 +33,7 @@ __all__ = [
     'create_compare',
     'create_hash',
     'assign_func',
+    'gen_slots',
     'add_slots',
     'freeze_fields',
 

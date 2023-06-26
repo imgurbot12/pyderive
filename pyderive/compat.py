@@ -189,7 +189,7 @@ def std_convert_fields(cls):
     return stdfields
 
 @lru_cache(maxsize=int(1e10))
-def std_convert_dataclass(cls):
+def std_convert_dataclass(cls, **kwargs):
     """
     convert pyderive dataclass to stdlib dataclass for 3rd party compatability
     
@@ -210,20 +210,16 @@ def std_convert_dataclass(cls):
     attrs  = [(f.name, f.type, f) for f in fields]
     # generate dataclass kwargs based on python version
     params = getattr(cls, PARAMS_ATTR)
-    kwargs = {
-        'init':        bool(params.init),
-        'repr':        bool(params.repr),
-        'eq':          params.eq,
-        'order':       params.order,
-        'unsafe_hash': params.unsafe_hash,
-        'frozen':      params.frozen,
-    }
+    kwargs.setdefault('init', bool(params.init))
+    kwargs.setdefault('repr', bool(params.repr))
+    kwargs.setdefault('eq', params.eq)
+    kwargs.setdefault('order', params.order)
+    kwargs.setdefault('unsafe_hash', params.unsafe_hash)
+    kwargs.setdefault('frozen', params.frozen)
     if sys.version_info.minor >= 10:
-        kwargs.update({
-            'match_args': params.match_args,
-            'kw_only':    params.kw_only,
-            'slots':      params.slots,
-        })
+        kwargs.setdefault('match_args', params.match_args)
+        kwargs.setdefault('kw_onky', params.kw_only)
+        kwargs.setdefault('slots', params.slots)
     # finalize dataclass generation
     dataclass = dataclasses.make_dataclass(name, attrs, bases=bases, **kwargs)
     # #NOTE: this magic resolves some seemingly random issues when passing 
