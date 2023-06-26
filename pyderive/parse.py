@@ -22,6 +22,8 @@ DERIVE_ATTR = '__derive__'
 #: track hashes of already compiled baseclasses
 COMPILED = set()
 
+COMPILED_ANNOTATIONS = set()
+
 #** Functions **#
 
 def remove_field(fields: ClassStruct, name: str):
@@ -52,10 +54,10 @@ def parse_fields(
     :param strict:  be strict on factory field type during parsing
     :return:        unprocessed dataclass field definitions
     """
-    global COMPILED
+    global COMPILED, COMPILED_ANNOTATIONS
     bases  = list(cls.__mro__) if recurse else [cls]
     fields = None
-    ftype: Type[FieldDef] = factory if strict else FieldDef #type: ignore
+    ftype: Type[FieldDef] = factory if strict else FieldDef
     while bases:
         # skip builtin bases
         base = bases.pop()
@@ -71,9 +73,13 @@ def parse_fields(
             fields = convert_fields(base, ftype)
             names  = [f.name for f in fields]
             parent = ClassStruct(names, {f.name:f for f in fields})
-        # process fields
-        fields      = ClassStruct(parent=parent)
+        fields = ClassStruct(parent=parent)
+        # skip evaluations is annotations have already been checked
         annotations = getattr(base, '__annotations__', {})
+        if id(annotations) in COMPILED_ANNOTATIONS:
+            continue
+        COMPILED_ANNOTATIONS.add(id(annotations))
+        # iterate annotations
         for name, anno in annotations.items():
             # handle ClassVar
             if get_origin(anno) is ClassVar:
