@@ -114,8 +114,15 @@ def create_init(
     globals: Dict[str, Any] = {HDF_VAR: HDF}
     args, post, body, kwonly = ['self'], [], [], []
     for field in fields:
+        # handle non-init edge cases
+        name = field.name
+        if not field.init and field.default is MISSING \
+            and field.default_factory is MISSING:
+            # raise an error if field is an init-var
+            if field.field_type == FieldType.INIT_VAR:
+                raise TypeError(f'field {name!r} must have init as InitVar')
+            continue
         # build parameter code
-        name  = field.name
         param = _init_param(field)
         value = _init_value(field, globals)
         if field.init:
