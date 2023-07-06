@@ -31,9 +31,6 @@ FIELD_ATTR = '__datafields__'
 #: dataclas params attribute
 PARAMS_ATTR = '__dataparams__'
 
-#: field generic type
-F = TypeVar('F', bound=FieldDef)
-
 #: type for type-alias
 TypeT = Type[T]
 

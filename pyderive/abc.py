@@ -9,6 +9,10 @@ from typing_extensions import Self, runtime_checkable
 #** Variables **#
 __all__ = [
     'T',
+    'F',
+
+    'has_default',
+
     'MISSING',
     'InitVar',
     'FrozenInstanceError',
@@ -24,11 +28,26 @@ __all__ = [
 #: generic typevar
 T = TypeVar('T')
 
+#: generic typevar for field
+F = TypeVar('F', bound='FieldDef')
+
 #: type definition for a list of fields
 Fields = List['FieldDef']
 
 #: callable factory type hint
 DefaultFactory = Union['MISSING', None, Callable[[], Any]]
+
+#: field validator function
+FieldValidator = Callable[[Any, F, Any], Any]
+
+#: optional field validator function
+OptValidator = Optional[FieldValidator]
+
+#** Functions **#
+
+def has_default(field: 'FieldDef') -> bool:
+    """return true if field has default"""
+    return field.default is not MISSING or field.default_factory is not MISSING
 
 #** Classes **#
 
@@ -61,6 +80,7 @@ class FieldDef(Protocol):
     compare:         bool           = True
     kw_only:         bool           = False
     frozen:          bool           = False
+    validator:       OptValidator   = None
     field_type:      FieldType      = FieldType.STANDARD
  
     @abstractmethod
@@ -84,6 +104,7 @@ class Field(FieldDef):
         compare:         bool           = True,
         kw_only:         bool           = False,
         frozen:          bool           = False,
+        validator:       OptValidator   = None,
         field_type:      FieldType      = FieldType.STANDARD
     ):
         self.name            = name
@@ -96,6 +117,7 @@ class Field(FieldDef):
         self.compare         = compare
         self.kw_only         = kw_only
         self.frozen          = frozen
+        self.validator       = validator
         self.field_type      = field_type
 
 class FlatStruct:

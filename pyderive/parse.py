@@ -124,10 +124,6 @@ def parse_fields(
         setattr(cls, DERIVE_ATTR, fields)
     return fields
 
-def has_default(field: FieldDef) -> bool:
-    """return true if field has default"""
-    return field.default is not MISSING or field.default_factory is not MISSING
-
 def flatten_fields(
     fields: ClassStruct, order_kw: bool = True) -> Fields:
     """
