@@ -150,7 +150,37 @@ class FlatStruct:
         return [self.fields[name] for name in self.order]
 
 class ClassStruct(FlatStruct):
- 
+    base:        Optional[Type]
+    annotations: Optional[Dict[str, Any]]
+
     def __init__(self, *args, parent: Optional[Self] = None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.parent = parent
+        self.parent      = parent
+        self.base        = None
+        self.annotations = None
+
+    def is_base_compiled(self, base: Type) -> bool:
+        """
+        check if baseclass is already compiled
+
+        :param base: baseclass to confirm already compiled
+        :return:     true if baseclass found in class-struct tree
+        """
+        if self.base is not None and self.base == base:
+            return True
+        if self.parent is not None:
+            return self.parent.is_base_compiled(base)
+        return False
+
+    def is_anno_compiled(self, anno: Dict[str, Any]) -> bool:
+        """
+        check if annotations are already compiled
+
+        :param anno: annotation to confirm already compiled
+        :return:     true if annotations are already compiled
+        """
+        if self.annotations is not None and self.annotations == anno:
+            return True
+        if self.parent is not None:
+            return self.parent.is_anno_compiled(anno)
+        return False
