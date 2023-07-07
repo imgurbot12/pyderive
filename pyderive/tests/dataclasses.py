@@ -13,7 +13,7 @@ __all__ = ['DataClassTests']
 #** Classes **#
 
 class DataClassTests(unittest.TestCase):
- 
+
     def test_initvar(self):
         """ensure InitVar works as intended"""
         @dataclass

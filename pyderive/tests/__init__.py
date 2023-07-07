@@ -3,7 +3,7 @@ PyDerive UnitTests
 """
 
 #** Variables **#
-__all__ = ['DataClassTests', 'ValidationTests']
+__all__ = ['DataClassTests', 'ValidationTests', 'ValidationModelTests']
 
 #** Imports **#
 from .dataclasses import *

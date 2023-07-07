@@ -3,7 +3,7 @@ PyDerive Extensions Tests
 """
 
 #** Variables **#
-__all__ = ['ValidationTests']
+__all__ = ['ValidationTests', 'ValidationModelTests']
 
 #** Imports **#
-from .validate import ValidationTests
+from .validate import *
