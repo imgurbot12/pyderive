@@ -202,7 +202,8 @@ class BaseModel:
         :param slots:    add slots to the model object
         :param kwargs:   extra arguments to pass to dataclass generation
         """
-        validate(cls, typecast, slots=False, **kwargs)
+        dataclass(cls, slots=False, **kwargs)
+        validate(cls, typecast)
         if slots:
             setattr(cls, '__slots__', gen_slots(cls, fields(cls)))
  

@@ -5,6 +5,7 @@ from enum import Enum
 from typing import List, Set, Tuple, Union
 from unittest import TestCase
 
+from ...dataclasses import dataclass
 from ...extensions.validate import ValidationError, BaseModel, validate
 
 #** Variables **#
@@ -195,3 +196,16 @@ class ValidationModelTests(TestCase):
         foo2 = Foo.parse_obj(((1, 'ok', 2.1), [1.1]))
         self.assertEqual(foo1, foo2)
         self.assertRaises(ValidationError, Foo.parse_obj, {'a': (1.0, 'ok', 2.1), 'bar': {'x': 'ok'}})
+
+    def test_model_subclass(self):
+        """test `BaseModel` inherritance of another dataclass"""
+        @dataclass
+        class Bar:
+            x: int
+        class Foo(Bar, BaseModel):
+            a: str
+        foo = Foo(1, 'a')
+        self.assertEqual(foo.x, 1)
+        self.assertEqual(foo.a, 'a')
+        self.assertRaises(ValidationError, Foo, '1', 'a')
+        self.assertRaises(ValidationError, Foo, 1, 2)
