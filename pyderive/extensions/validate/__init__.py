@@ -1,11 +1,11 @@
 """
 PyDantic Inspired Pyderive Validator Extensions
 """
-from ipaddress import *
 from typing import Any, Mapping, Sequence, Set, Type, Union, overload
-from typing_extensions import Annotated, Self, dataclass_transform
+from typing_extensions import Self, dataclass_transform
 from warnings import warn
 
+from .types import *
 from .validators import *
 
 from ...abc import T, TypeT, DataFunc, has_default
@@ -19,12 +19,22 @@ __all__ = [
     'IPvAnyAddress',
     'IPvAnyNetwork',
     'IPvAnyInterface',
+    'URL',
+    'Domain',
+    'Host',
+    'Port',
+    'ExistingFile',
+    'Datetime',
+    'Timedelta',
 
     'has_validation',
     'validate',
     'from_object',
     'from_mapping',
     'from_sequence',
+
+    'TypeValidator',
+    'register_validator',
 
     'BaseModel',
     'Validator',
@@ -34,13 +44,6 @@ __all__ = [
 
 #: attribute to store dataclass validation information
 VALIDATE_ATTR = '__pyderive_validate__'
-
-IPv4 = Annotated[Union[IPv4Address, str, bytes], PreValidator[IPv4Address]]
-IPv6 = Annotated[Union[IPv6Address, str, bytes], PreValidator[IPv6Address]]
-
-IPvAnyAddress = Annotated[Union[IPv4Address, IPv6Address, str, bytes], PreValidator[ip_address]]
-IPvAnyNetwork = Annotated[Union[IPv4Network, IPv6Network, str, bytes], PreValidator[ip_network]]
-IPvAnyInterface = Annotated[Union[IPv4Interface, IPv6Interface, str, bytes], PreValidator[ip_interface]]
 
 #** Functions **#
 

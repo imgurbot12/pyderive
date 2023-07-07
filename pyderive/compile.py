@@ -23,6 +23,8 @@ __all__ = [
     'freeze_fields',
 ]
 
+#:TODO: add unit-test for validator added with default/default-factory/frozen
+
 #: post init function
 POST_INIT = '__post_init__'
 
@@ -96,13 +98,19 @@ def _init_assign(self_name: str, name: str, value: str, frozen: bool) -> str:
     return f'{self_name}.{name}={value}'
 
 def _init_validator(self_name: str, 
-    field: FieldDef, value: str, globals: dict) -> str:
+    field: FieldDef, value: str, globals: dict) -> Tuple[List[str], str]:
     """generate field validator function call"""
     field_name = f'_field_{field.name}'
     validator  = f'_validate_{field.name}'
     globals[field_name] = field
     globals[validator]  = field.validator
-    return f'{value}={validator}({self_name}, {field_name}, {value})'
+    # generate validators/value code
+    validators = []
+    if field.default_factory is not MISSING:
+        validators.append(f'{field.name}={value}')
+        value = field.name
+    validators += [f'{value}={validator}({self_name}, {field_name}, {value})']
+    return validators, value
 
 def create_init(
     fields:    Fields,
@@ -142,8 +150,8 @@ def create_init(
         if field.validator is not None:
             if not callable(field.validator):
                 raise TypeError(f'field {name!r} validator is not callable')
-            validator = _init_validator(self_name, field, value, globals)
-            validators.append(validator)
+            validator, value = _init_validator(self_name, field, value, globals)
+            validators.extend(validator)
         # track init-vars for later generation
         if field.field_type == FieldType.INIT_VAR:
             if field.default_factory is not MISSING:

@@ -2,7 +2,7 @@
 Type/Field Validator Implementations
 """
 from enum import Enum
-from typing import Callable, List, Mapping, Tuple, Type, Any, Sequence, Union
+from typing import *
 from typing_extensions import Annotated, get_origin, get_args
 
 from ...abc import FieldDef, FieldValidator
@@ -14,6 +14,7 @@ __all__ = [
     'is_sequence',
     'type_validator',
     'field_validator',
+    'register_validator',
     
     'ValidationError',
     
@@ -24,6 +25,9 @@ __all__ = [
 
 #: type validator / type translation function
 TypeValidator = Callable[[Any], Any]
+
+#: global type-validator registry
+TYPE_VALIDATORS: Dict[Type, List[TypeValidator]] = {}
 
 #** Functions **#
 
@@ -65,7 +69,7 @@ def simple_validator(cast: Type, typecast: bool) -> TypeValidator:
         if typecast:
             try:
                 return cast(value)
-            except Exception:
+            except (ValueError, ValidationError):
                 pass
         raise ValidationError(f'Invalid {name}: {value!r}')
     return validator
@@ -173,11 +177,11 @@ def enum_validator(anno: Type[Enum], typecast: bool) -> TypeValidator:
         if typecast:
             try:
                 return anno[value]
-            except Exception:
+            except (ValueError, ValidationError):
                 pass
             try:
                 return anno(value)
-            except Exception:
+            except (ValueError, ValidationError):
                 pass
         raise ValidationError(f'Invalid {anno.__name__}: {value!r}')
     return validator
@@ -192,14 +196,30 @@ def union_validator(anno: Type,
     :param validators: validators to execute
     :return:           generated union validator
     """
+    # parse valid simple python types from specified arguments
+    # those are the only ones allowed for faster `isinstance` check
+    wrapped = list(args)
+    annotations = []
+    while wrapped:
+        anno = wrapped.pop()
+        origin, subargs = get_origin(anno), get_args(anno)
+        if origin is None:
+            annotations.append(anno)
+            continue
+        elif origin is Annotated:
+            wrapped.append(subargs[0])
+        elif origin is Union:
+            wrapped.extend(subargs)
+    annotations = tuple(annotations)
+    # generate valdiator object
     @_wrap(_anno_name(anno))
     def validator(value: Any):
-        if isinstance(value, args):
+        if isinstance(value, annotations):
             return value
         for validator in validators:
             try:
                 return validator(value)
-            except Exception:
+            except (ValueError, ValidationError):
                 pass
         raise ValidationError(f'Invalid Value: {value!r}')
     return validator
@@ -227,6 +247,9 @@ def type_validator(anno: Type, typecast: bool) -> TypeValidator:
     # check for standard validator types
     if anno is None or anno is type(None):
         return none_validator
+    # check if type is specifically registered
+    if anno in TYPE_VALIDATORS:
+        return chain_validators(TYPE_VALIDATORS[anno])
     # check for `Enum` annotation
     if isinstance(anno, type) and issubclass(anno, Enum):
         return enum_validator(anno, typecast)
@@ -285,6 +308,17 @@ def field_validator(field: FieldDef, typecast: bool = False) -> FieldValidator:
     field_validator.__name__ = f'validate_{field.name}'
     field_validator.__qualname__ = field_validator.__name__
     return field_validator
+
+def register_validator(anno: Type, validator: TypeValidator):
+    """
+    register a new type validator for the given annotation
+    
+    :param anno:      annotation to register type validator with
+    :param validator: validator function for the specified type
+    """
+    global TYPE_VALIDATORS
+    TYPE_VALIDATORS.setdefault(anno, [])
+    TYPE_VALIDATORS[anno].append(validator)
 
 #** Classes **#
 
