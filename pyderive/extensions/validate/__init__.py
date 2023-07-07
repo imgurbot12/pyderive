@@ -24,6 +24,7 @@ __all__ = [
     'Host',
     'Port',
     'ExistingFile',
+    'Loglevel',
     'Datetime',
     'Timedelta',
 

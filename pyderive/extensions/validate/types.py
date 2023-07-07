@@ -4,10 +4,11 @@ Custom Annotated Validator Types
 from datetime import datetime, timedelta
 import os
 import re
+import logging
 from ipaddress import *
-from typing import Callable, Iterator, Union
-from urllib.parse import urlsplit
+from typing import Union
 from typing_extensions import Annotated
+from urllib.parse import urlsplit
 
 from .validators import *
 
@@ -24,6 +25,7 @@ __all__ = [
     'Host',
     'Port',
     'ExistingFile',
+    'Loglevel',
     'Datetime',
     'Timedelta',
 ]
@@ -67,6 +69,20 @@ def is_port(value: int):
     if value < 0 or value >= (2**16):
         raise ValidationError(f'Invalid Port: {value!r}')
     return value
+
+def is_loglevel(value: 'Loglevel') -> int:
+    """check if value is valid loglevel"""
+    if isinstance(value, int):
+        return value
+    if not isinstance(value, str):
+        raise ValueError(value)
+    try:
+        level = getattr(logging, value.upper())
+    except AttributeError:
+        raise ValueError(value) from None
+    if not isinstance(level, int):
+        raise ValueError(value)
+    return level
 
 def is_datetime(value: 'Datetime') -> datetime:
     """check if value is valid datetime"""
@@ -121,6 +137,9 @@ Port = Annotated[int, Validator[is_port]]
 
 #: only allow valid and existing filepaths
 ExistingFile = Annotated[str, Validator[is_existing_file]]
+
+#: stdlib logging loglevel validator
+Loglevel = Annotated[Union[int, str], Validator[is_loglevel]]
 
 #: datetime validator
 Datetime = Annotated[Union[str, int, datetime], Validator[is_datetime]]
