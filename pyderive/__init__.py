@@ -1,7 +1,7 @@
 """
 Custom DataClass Compilation Helpers
 """
-from typing import Type, Any
+from typing import Dict, Type, Any
 
 from .abc import *
 from .parse import *
@@ -40,6 +40,7 @@ __all__ = [
     'is_dataclass',
     'field',
     'fields',
+    'astuple',
     'asdict',
     'dataclass',
     'DataClassLike',
@@ -55,4 +56,5 @@ class BaseField(FieldDef):
     name:            str            = ''
     anno:            Type           = type
     default:         Any            = field(default_factory=lambda: MISSING)
-    default_factory: DefaultFactory = field(default_factory=lambda: MISSING) 
+    default_factory: DefaultFactory = field(default_factory=lambda: MISSING)
+    metadata:        Dict[str, Any] = field(default_factory=dict)

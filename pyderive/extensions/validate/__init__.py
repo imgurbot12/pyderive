@@ -2,14 +2,15 @@
 PyDantic Inspired Pyderive Validator Extensions
 """
 from ipaddress import *
-from typing import Any, Mapping, Sequence, Set, Type, Union, Callable, overload
-from typing_extensions import Annotated
+from typing import Any, Mapping, Sequence, Set, Type, Union, overload
+from typing_extensions import Annotated, Self, dataclass_transform
+from warnings import warn
 
 from .validators import *
 
-from ...abc import T, has_default
-from ...compile import assign_func, create_init
-from ...dataclasses import POST_INIT, PARAMS_ATTR, FIELD_ATTR, is_dataclass
+from ...abc import T, TypeT, DataFunc, has_default
+from ...compile import assign_func, create_init, gen_slots
+from ...dataclasses import POST_INIT, PARAMS_ATTR, FIELD_ATTR, fields, is_dataclass, dataclass
 
 #** Variables **#
 __all__ = [
@@ -19,12 +20,20 @@ __all__ = [
     'IPvAnyNetwork',
     'IPvAnyInterface',
 
+    'has_validation',
     'validate',
+    'from_object',
+    'from_mapping',
+    'from_sequence',
 
+    'BaseModel',
     'Validator',
     'PreValidator',
     'PostValidator',
 ]
+
+#: attribute to store dataclass validation information
+VALIDATE_ATTR = '__pyderive_validate__'
 
 IPv4 = Annotated[Union[IPv4Address, str, bytes], PreValidator[IPv4Address]]
 IPv6 = Annotated[Union[IPv6Address, str, bytes], PreValidator[IPv6Address]]
@@ -35,41 +44,61 @@ IPvAnyInterface = Annotated[Union[IPv4Interface, IPv6Interface, str, bytes], Pre
 
 #** Functions **#
 
+def has_validation(cls) -> bool:
+    """
+    return true if object has validation enabled
+
+    :param cls: dataclass object
+    :return:    true if object has validation else false
+    """
+    return is_dataclass(cls) and hasattr(cls, VALIDATE_ATTR)
+
 @overload
-def validate(cls: None = None, typecast: bool = False) -> Callable[[T], T]:
+def validate(cls: None = None, typecast: bool = False, **kwargs) -> DataFunc:
     ...
 
 @overload
-def validate(cls: T, typecast: bool = False) -> T:
+def validate(cls: TypeT, typecast: bool = False, **kwargs) -> TypeT:
     ...
 
-def validate(cls = None, typecast: bool = False):
+@dataclass_transform()
+def validate(cls = None, typecast: bool = False, **kwargs):
     """
     validation decorator to use on top of an existing dataclass
 
     :param cls:      dataclass instance
     :param typecast: enable typecasting during validation
+    :param kwargs:   kwargs to apply when generating dataclass
     :return:         same dataclass instance now validation wrapped
     """
-    def wrapper(cls: T) -> T:
+    def wrapper(cls: TypeT) -> TypeT:
+        # convert to dataclass using kwargs if not already a dataclass
+        if kwargs and is_dataclass(cls):
+            raise TypeError(f'{cls} is already a dataclass!')
         if not is_dataclass(cls):
-            raise TypeError('Cannot validate non-dataclass instance!')
+            kwargs.setdefault('slots', True)
+            cls = dataclass(cls, init=False, **kwargs)
         # append validators to the field definitions
         fields = getattr(cls, FIELD_ATTR)
         params = getattr(cls, PARAMS_ATTR)
-        for field in fields:
-            field.validator = field.validator or field_validator(field, typecast)
+        for f in fields:
+            f.validator = f.validator or field_validator(f, typecast)
+            # recursively configure dataclass annotations
+            if is_dataclass(f.anno) and not hasattr(f.anno, VALIDATE_ATTR):
+                f.anno = validate(f.anno, typecast)
         # regenerate init to include new validators
         post_init = hasattr(cls, POST_INIT)
         func = create_init(fields, params.kw_only, post_init, params.frozen)
         assign_func(cls, func, overwrite=True)
+        # set validate-attr and preserve configuration settings
+        setattr(cls, VALIDATE_ATTR, ValidateParams(typecast))        
         return cls
     return wrapper if cls is None else wrapper(cls)
 
 def _parse_object(anno: Type, value: Any, **kwargs) -> Any:
-    """"""
+    """recursively parse dataclass annotation"""
     if is_dataclass(anno):
-        if isinstance(value, (set, Sequence)) and not isinstance(value, str):
+        if is_sequence(value):
             return from_sequence(anno, value, **kwargs)
         elif isinstance(value, Mapping):
             return from_mapping(anno, value, **kwargs)
@@ -77,10 +106,17 @@ def _parse_object(anno: Type, value: Any, **kwargs) -> Any:
 
 def from_sequence(cls: Type[T], values: Union[Sequence, Set], **kwargs) -> T:
     """
-    parse random sequence into a valid dataclasss object
+    parse sequence into a valid dataclasss object
+
+    :param cls:    validation capable dataclass object
+    :param values: sequence to parse into valid dataclass object
+    :param kwargs: additional arguments to pass to recursive evaluation
+    :return:       parsed dataclass object
     """
     if not is_dataclass(cls) and not isinstance(cls, type):
         raise TypeError(f'Cannot construct non-dataclass instance!')
+    if not has_validation(cls):
+        warn(f'Dataclass: {cls.__name__} has no type validation.')
     # check range of parameters
     fields = getattr(cls, FIELD_ATTR)
     if len(values) > len(fields):
@@ -94,23 +130,31 @@ def from_sequence(cls: Type[T], values: Union[Sequence, Set], **kwargs) -> T:
             required.insert(pos, field)
         fields = required
     # iterate values and try to match to annotations
-    kwargs = {}
+    attrs = {}
     for field, value in zip(fields, values):
-        kwargs[field.name] = _parse_object(field.anno, value, **kwargs)
-    return cls(**kwargs)
+        attrs[field.name] = _parse_object(field.anno, value, **kwargs)
+    return cls(**attrs)
 
 def from_mapping(cls: Type[T], 
     values: Mapping, *, allow_unknown: bool = False, **kwargs) -> T:
     """
-    parse random mapping into a valid dataclass object
+    parse mapping into a valid dataclass object
+
+    :param cls:           validation capable dataclass object
+    :param values:        sequence to parse into valid dataclass object
+    :param allow_unknown: allow for unknown and invalid keys during dict parsing
+    :param kwargs:        additional arguments to pass to recursive evaluation
+    :return:              parsed dataclass object
     """
     if not is_dataclass(cls) and not isinstance(cls, type):
         raise TypeError(f'Cannot construct non-dataclass instance!')
-    kwargs.setdefault('allow_unknown', allow_unknown)
+    if not has_validation(cls):
+        warn(f'Dataclass: {cls.__name__} has no type validation.')
     # parse key/value into kwargs
-    kwargs = {}
+    kwargs.setdefault('allow_unknown', allow_unknown)
     fields = getattr(cls, FIELD_ATTR)
     fdict  = {f.name:f for f in fields}
+    attrs  = {}
     for key, value in values.items():
         # handle unexpected keys
         if key not in fdict:
@@ -119,17 +163,63 @@ def from_mapping(cls: Type[T],
             raise KeyError(f'Unknown Key: {key!r}')
         # translate value based on annotation
         field       = fdict[key]
-        kwargs[key] = _parse_object(field.anno, value, **kwargs)
-    return cls(**kwargs)
+        attrs[key] = _parse_object(field.anno, value, **kwargs)
+    return cls(**attrs)
 
-def from_object(cls: Type[T], values: Any, **kwargs) -> T:
+def from_object(cls: Type[T], value: Any, **kwargs) -> T:
     """
-    parse random python object construction into valid dataclass instance
+    parse an object into a valid dataclass instance
+
+    :param cls:    validation capable dataclass object
+    :param values: object into valid dataclass object
+    :param kwargs: additional arguments to pass to recursive evaluation
+    :return:       parsed dataclass object
     """
     if not is_dataclass(cls) and not isinstance(cls, type):
         raise TypeError(f'Cannot construct non-dataclass instance!')
-    if isinstance(values, (set, Sequence)) and not isinstance(values, str):
-        return from_sequence(cls, values, **kwargs)
-    elif isinstance(values, Mapping):
-        return from_mapping(cls, values, **kwargs)
-    raise TypeError(f'Cannot deconstruct: {values!r}')
+    if is_sequence(value):
+        return from_sequence(cls, value, **kwargs)
+    elif isinstance(value, Mapping):
+        return from_mapping(cls, value, **kwargs)
+    raise TypeError(f'Cannot deconstruct: {value!r}')
+
+#** Classes **#
+
+@dataclass(slots=True)
+class ValidateParams:
+    typecast: bool = False
+
+@dataclass_transform()
+class BaseModel:
+    """
+    PyDantic Inspirted Validation Model MetaClass
+    """
+
+    def __init_subclass__(cls, 
+        typecast: bool = False, slots: bool = True, **kwargs):
+        """
+        :param typecast: allow typecasting of input values
+        :param slots:    add slots to the model object
+        :param kwargs:   extra arguments to pass to dataclass generation
+        """
+        validate(cls, typecast, slots=False, **kwargs)
+        if slots:
+            setattr(cls, '__slots__', gen_slots(cls, fields(cls)))
+ 
+    def validate(self):
+        """run ad-hoc validation against current model values"""
+        for field in fields(self):
+            value = getattr(self, field.name)
+            if field.validator is not None:
+                field.validator(self, field, value)
+
+    @classmethod
+    def parse_obj(cls, value: Any, **kwargs) -> Self:
+        """
+        parse value into valid dataclass object
+
+        :param value:  object to parse into dataclass
+        :param kwargs: additional arguments to pass to parser
+        :return:       model instance
+        """
+        return from_object(cls, value, **kwargs)

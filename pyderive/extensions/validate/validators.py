@@ -1,6 +1,7 @@
 """
 Type/Field Validator Implementations
 """
+from enum import Enum
 from typing import Callable, List, Mapping, Tuple, Type, Any, Sequence, Union
 from typing_extensions import Annotated, get_origin, get_args
 
@@ -10,6 +11,7 @@ from ...abc import FieldDef, FieldValidator
 __all__ = [
     'TypeValidator',
 
+    'is_sequence',
     'type_validator',
     'field_validator',
     
@@ -29,6 +31,17 @@ def _anno_name(anno: Type) -> str:
     """generate clean annotation name"""
     return str(anno).split('typing.', 1)[-1]
 
+def _wrap(name: str) -> Callable[[Callable], Callable]:
+    def wrapper(func: Callable) -> Callable:
+        func.__name__ = f'validate_{name}'
+        func.__qualname__ = func.__name__
+        return func
+    return wrapper
+
+def is_sequence(value: Any) -> bool:
+    """return true if the given value is a valid sequence"""
+    return isinstance(value, (set, Sequence)) and not isinstance(value, str)
+
 def none_validator(value: Any):
     """
     validate value is a none-type
@@ -45,6 +58,7 @@ def simple_validator(cast: Type, typecast: bool) -> TypeValidator:
     :return:         type-validator that attempts typecast
     """
     name = cast.__name__
+    @_wrap(name)
     def validator(value: Any) -> Any:
         if isinstance(value, cast):
             return value
@@ -54,21 +68,22 @@ def simple_validator(cast: Type, typecast: bool) -> TypeValidator:
             except Exception:
                 pass
         raise ValidationError(f'Invalid {name}: {value!r}')
-    validator.__name__ = f'cast_{name}'
-    validator.__qualname__ = validator.__name__
     return validator
 
-def seq_validator(outer: Type, base: Type, iv: TypeValidator) -> TypeValidator:
+def seq_validator(outer: Type, base: Type, iv: TypeValidator, typecast: bool) -> TypeValidator:
     """
     generate generic sequence-type typecast validator for the specified type
 
-    :param outer: outer sequence type definition
-    :param iv:    validation for inner sequence type
-    :return:      custom sequence validation function
+    :param outer:    outer sequence type definition
+    :param iv:       validation for inner sequence type
+    :param typecast: allow typecasting when enabled
+    :return:         custom sequence validation function
     """
     name = _anno_name(outer)
+    @_wrap(name)
     def validator(value: Sequence[Any]):
-        if not isinstance(value, Sequence) or isinstance(value, str):
+        if (base and not typecast and not isinstance(value, base)) \
+            or not is_sequence(value):
             raise ValidationError(f'Invalid {name}: {value!r}')
         values = []
         for n, item in enumerate(value, 0):
@@ -78,8 +93,6 @@ def seq_validator(outer: Type, base: Type, iv: TypeValidator) -> TypeValidator:
             except Exception as e:
                 raise ValidationError(f'Index {n}, {e}') from None
         return base(values)
-    validator.__name__ = f'validate_{name}'
-    validator.__qualname__ = validator.__name__
     return validator
 
 def map_validator(outer: Type, 
@@ -94,6 +107,7 @@ def map_validator(outer: Type,
     :return:      custom mapping validation function
     """
     name = _anno_name(outer)
+    @_wrap(name)
     def validator(value: Mapping[Any, Any]):
         if not isinstance(value, Mapping):
             raise ValidationError(f'Invalid {name}: {value!r}')
@@ -103,8 +117,6 @@ def map_validator(outer: Type,
             newval = vv(v)
             values[newkey] = newval
         return base(values)
-    validator.__name__ = f'validate_{name}'
-    validator.__qualname__ = validator.__name__
     return validator
 
 def tup_validator(anno: Type, validators: List[TypeValidator], 
@@ -119,6 +131,7 @@ def tup_validator(anno: Type, validators: List[TypeValidator],
     :return:           custom tuple validator function 
     """
     name = _anno_name(anno)
+    @_wrap(name)
     def validator(value: Any):
         # convert to tuple or raise error
         if not isinstance(value, tuple):
@@ -143,8 +156,30 @@ def tup_validator(anno: Type, validators: List[TypeValidator],
                 newitem = validator(item)
                 values.append(newitem)
         return tuple(values)
-    validator.__name__ = f'validate_{name}'
-    validator.__qualname__ = validator.__name__
+    return validator
+
+def enum_validator(anno: Type[Enum], typecast: bool) -> TypeValidator:
+    """
+    generate validator for specified enum annotation
+
+    :param anno:     enum annotation
+    :param typecast: allow typecasting to enum
+    :return:         generated enum validator
+    """
+    @_wrap(anno.__name__)
+    def validator(value: Any):
+        if isinstance(value, anno):
+            return value
+        if typecast:
+            try:
+                return anno[value]
+            except Exception:
+                pass
+            try:
+                return anno(value)
+            except Exception:
+                pass
+        raise ValidationError(f'Invalid {anno.__name__}: {value!r}')
     return validator
 
 def union_validator(anno: Type, 
@@ -157,7 +192,7 @@ def union_validator(anno: Type,
     :param validators: validators to execute
     :return:           generated union validator
     """
-    name = _anno_name(anno)
+    @_wrap(_anno_name(anno))
     def validator(value: Any):
         if isinstance(value, args):
             return value
@@ -167,8 +202,6 @@ def union_validator(anno: Type,
             except Exception:
                 pass
         raise ValidationError(f'Invalid Value: {value!r}')
-    validator.__name__ = f'validate_{name}'
-    validator.__qualname__ = validator.__name__
     return validator
 
 def chain_validators(validators: List[TypeValidator]) -> TypeValidator:
@@ -186,7 +219,7 @@ def chain_validators(validators: List[TypeValidator]) -> TypeValidator:
 
 def type_validator(anno: Type, typecast: bool) -> TypeValidator:
     """
-    generate a tcheck if type is an iterable list, set, tuple, etcype-validator for the given annotation
+    generate a type-validator for the given annotation
 
     :param anno: annotation to validate for
     :return:     field validator for the given annotation
@@ -194,6 +227,9 @@ def type_validator(anno: Type, typecast: bool) -> TypeValidator:
     # check for standard validator types
     if anno is None or anno is type(None):
         return none_validator
+    # check for `Enum` annotation
+    if isinstance(anno, type) and issubclass(anno, Enum):
+        return enum_validator(anno, typecast)
     # check for `Annotated` validator definitions
     origin, args = get_origin(anno), get_args(anno)
     if origin is Annotated:
@@ -221,7 +257,7 @@ def type_validator(anno: Type, typecast: bool) -> TypeValidator:
     if origin in (list, set, Sequence):
         base      = list if origin is Sequence else origin
         validator = type_validator(args[0], typecast)
-        return seq_validator(anno, base, validator)
+        return seq_validator(anno, base, validator, typecast)
     # check for `Mapping` annnotation
     if origin in (dict, Mapping):
         base          = dict if origin is Mapping else origin

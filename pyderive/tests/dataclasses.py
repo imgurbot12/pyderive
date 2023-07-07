@@ -92,3 +92,28 @@ class DataClassTests(unittest.TestCase):
             c:   List[str] = field(default_factory=list)
         b = Bar(Foo(1), 2)
         self.assertDictEqual(asdict(b), {'foo': {'a': 1}, 'b': 2, 'c': []})
+
+    def test_astuple(self):
+        """ensure astuple function as intended"""
+        @dataclass
+        class Foo:
+            a: int = 0
+        @dataclass
+        class Bar:
+            foo: Foo
+            b:   int       = 1
+            c:   List[str] = field(default_factory=list)
+        bar = Bar(Foo(1), 2)
+        tup = astuple(bar)
+        self.assertIsInstance(tup, tuple)
+        self.assertListEqual(list(tup), [(1, ), 2, []])
+
+    def test_slots(self):
+        """ensure slots generation works as intended"""
+        @dataclass(slots=True)
+        class Foo:
+            a: int
+            b: int
+            c: InitVar[int]
+        self.assertTrue(hasattr(Foo, '__slots__'))
+        self.assertEqual(Foo.__slots__, ('a', 'b', ))

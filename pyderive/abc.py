@@ -8,8 +8,12 @@ from typing_extensions import Self, runtime_checkable
 
 #** Variables **#
 __all__ = [
+    'has_default',
+
     'T',
     'F',
+    'TypeT',
+    'DataFunc',
 
     'has_default',
 
@@ -31,8 +35,17 @@ T = TypeVar('T')
 #: generic typevar for field
 F = TypeVar('F', bound='FieldDef')
 
+#: generic typevar bound to type
+TypeT = TypeVar('TypeT', bound=Type)
+
+#: typehint for dataclass creator function
+DataFunc = Callable[[TypeT], TypeT] 
+
 #: type definition for a list of fields
 Fields = List['FieldDef']
+
+#: optional dictionary typehint
+OptDict = Optional[Dict[str, Any]]
 
 #: callable factory type hint
 DefaultFactory = Union['MISSING', None, Callable[[], Any]]
@@ -81,6 +94,7 @@ class FieldDef(Protocol):
     kw_only:         bool           = False
     frozen:          bool           = False
     validator:       OptValidator   = None
+    metadata:        Dict[str, Any] = {}
     field_type:      FieldType      = FieldType.STANDARD
  
     @abstractmethod
@@ -105,6 +119,7 @@ class Field(FieldDef):
         kw_only:         bool           = False,
         frozen:          bool           = False,
         validator:       OptValidator   = None,
+        metadata:        OptDict        = None,
         field_type:      FieldType      = FieldType.STANDARD
     ):
         self.name            = name
@@ -118,6 +133,7 @@ class Field(FieldDef):
         self.kw_only         = kw_only
         self.frozen          = frozen
         self.validator       = validator
+        self.metadata        = metadata or {}
         self.field_type      = field_type
 
 class FlatStruct:

@@ -21,6 +21,7 @@ __all__ = [
     'is_dataclass',
     'field', 
     'fields',
+    'astuple',
     'asdict',
     'dataclass'
 ]
@@ -30,12 +31,6 @@ FIELD_ATTR = '__datafields__'
 
 #: dataclas params attribute
 PARAMS_ATTR = '__dataparams__'
-
-#: type for type-alias
-TypeT = Type[T]
-
-#: typehint for dataclass creator function
-DataFunc = Callable[[TypeT], TypeT] 
 
 _hash_add  = lambda _, fields: create_hash(fields)
 _hash_none = lambda *_: None
@@ -104,7 +99,45 @@ def fields(cls, all_types: bool = False):
         fields = [f for f in fields if f.field_type == FieldType.STANDARD]
     return fields
 
-def _asdict_inner(obj, rec: int, factory: Type[dict], lvl: int):
+def _astuple_inner(obj, rec: int, factory: Type[tuple], lvl: int) -> Any:
+    """inner tuple-ify function to convert dataclass fields to tuple"""
+    # stop recursin after limit
+    if rec > 0 and lvl >= rec:
+        return obj
+    # dataclass
+    lvl += 1
+    if is_dataclass(obj):
+        result = []
+        for f in fields(obj):
+            attr  = getattr(obj, f.name)
+            value = _astuple_inner(attr, rec, factory, lvl)
+            result.append(value)
+        return factory(result)
+    # named-tuple
+    elif isinstance(obj, tuple) and hasattr(obj, '_fields'):
+        return type(obj)(*[_astuple_inner(v, rec, factory, lvl) for v in obj])
+    # standard list/tuple
+    elif isinstance(obj, (list, tuple)):
+        return type(obj)(_astuple_inner(v, rec, factory, lvl) for v in obj)
+    elif isinstance(obj, dict):
+        return type(obj)((_astuple_inner(k, rec, factory, lvl),
+                          _astuple_inner(v, rec, factory, lvl))
+                         for k, v in obj.items())
+    else:
+        return copy.deepcopy(obj)
+
+def astuple(cls, *, recurse: int = 0, tuple_factory: Type[tuple] = tuple) -> tuple:
+    """
+    convert dataclass object into dictionary of field-values
+
+    :param cls: dataclass object class instance
+    :return:    field instances as dict
+    """
+    if not is_dataclass(cls):
+        raise TypeError('astuple() should be called on dataclass instances')
+    return _astuple_inner(cls, recurse, tuple_factory, 0)
+
+def _asdict_inner(obj, rec: int, factory: Type[dict], lvl: int) -> Any:
     """inner dictionary-ify function to convert dataclass fields into dict"""
     # stop recursin after limit
     if rec > 0 and lvl >= rec:
@@ -140,7 +173,7 @@ def asdict(cls, *, recurse: int = 0, dict_factory: Type[dict] = dict) -> dict:
     """
     if not is_dataclass(cls):
         raise TypeError('asdict() should be called on dataclass instances')
-    return _asdict_inner(cls, recurse, dict_factory, 0) #type: ignore
+    return _asdict_inner(cls, recurse, dict_factory, 0)
 
 @dataclass_transform(field_specifiers=(FieldDef, Field, field))
 def _process_class(
@@ -229,7 +262,7 @@ def _process_class(
         cls = add_slots(cls, fields, freeze)
     # update abstraction-methods on re-creation and return
     if hasattr(abc, 'update_abstractmethods'):
-        abc.update_abstractmethods(cls)
+        abc.update_abstractmethods(cls) #type: ignore
     return cls
 
 @overload
