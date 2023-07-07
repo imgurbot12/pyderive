@@ -90,7 +90,10 @@ def parse_fields(
             member_desc = isinstance(default, MemberDescriptorType)
             default     = MISSING if member_desc else default
             if delete and hasattr(base, name) and not member_desc:
-                delattr(base, name)
+                try: 
+                    delattr(base, name)
+                except AttributeError:
+                    pass
             # preserve order of fields and add vardef
             if name not in fields.order:
                 fields.order.append(name)

@@ -70,7 +70,7 @@ class ValidationTests(TestCase):
 
     def test_enum_value(self):
         """ensure enum validation works properly"""
-        class Bar4(Enum): #change me
+        class Bar9(Enum): #change me
             A = 'foo'
             B = 'bar'
         # @validate(typecast=True)
