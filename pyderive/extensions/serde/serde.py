@@ -214,9 +214,9 @@ def from_mapping(cls: Type[T],
             raise KeyError(f'Unknown Key: {key!r}')
         # translate value based on annotation
         field = fdict[key]
-        value = _parse_object(field.anno, value, **kwargs)
-        if not skip_field(field, value):
-            attrs[field.name] = value
+        if skip_field(field, value):
+            continue
+        attrs[field.name] = _parse_object(field.anno, value, **kwargs)
     return cls(**attrs)
 
 def from_object(cls: Type[T], value: Any, **kwargs) -> T:
@@ -235,6 +235,12 @@ def from_object(cls: Type[T], value: Any, **kwargs) -> T:
     elif isinstance(value, Mapping):
         return from_mapping(cls, value, **kwargs)
     raise TypeError(f'Cannot deconstruct: {value!r}')
+
+#TODO: asdict/astuple current method is unsustainable and does not work for complex
+# data types.
+
+#TODO: ensure asdict/astuple works with lists/sequences of dataclass objects
+#TODO: improve and complete from-xml function
 
 def _get_dataclasses(cls) -> List[Type]:
     """get dataclass instances within self and fields in reverse order"""
