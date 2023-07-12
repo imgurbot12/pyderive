@@ -5,24 +5,33 @@ import json
 from typing import Type
 
 from .serde import *
-from .serde import RENAME_ATTR
-from ...dataclasses import fields, is_dataclass
 
 #** Variables **#
 __all__ = [
     'JsonSerial', 
     'YamlSerial',
     'TomlSerial',
+    'XmlSerial',
     'JsonDeserial',
     'YamlDeserial',
     'TomlDeserial',
+    'XmlDeserial',
 ]
 
 #** Functions **#
 
-def get_object_kwargs(kwargs: dict) -> dict:
+def get_serial_kwargs(kwargs: dict) -> dict:
+    """pop object encoding kwargs from dict"""
+    keys = ('encoder', )
+    args = {}
+    for key in keys:
+        if key in kwargs:
+            args[key] = kwargs.pop(key)
+    return args
+
+def get_deserial_kwargs(kwargs: dict) -> dict:
     """pop object parsing kwargs from dict"""
-    keys = ('allow_unknown', )
+    keys = ('allow_unknown', 'decoder')
     args = {}
     for key in keys:
         if key in kwargs:
@@ -36,14 +45,15 @@ class JsonSerial(Serializer[str]):
 
     @classmethod
     def serialize(cls, obj: Type, **options) -> str:
-        return json.dumps(to_dict(obj), **options)
+        kwargs = get_serial_kwargs(options)
+        return json.dumps(to_dict(obj, **kwargs), **options)
 
 class JsonDeserial(Deserializer[str]):
     """"""
 
     @classmethod
     def deserialize(cls, obj: Type[T], raw: str, **options) -> T:
-        kwargs = get_object_kwargs(options)
+        kwargs = get_deserial_kwargs(options)
         return from_object(obj, json.loads(raw, **options), **kwargs)
 
 class YamlSerial(Serializer[str]):
@@ -52,7 +62,8 @@ class YamlSerial(Serializer[str]):
     @classmethod
     def serialize(cls, obj: Type, **options) -> str:
         import yaml
-        return yaml.safe_dump(to_dict(obj), **options)
+        kwargs = get_serial_kwargs(options)
+        return yaml.safe_dump(to_dict(obj, **kwargs), **options)
 
 class YamlDeserial(Deserializer[str]):
     """"""
@@ -60,7 +71,7 @@ class YamlDeserial(Deserializer[str]):
     @classmethod
     def deserialize(cls, obj: Type[T], raw: str, **options) -> T:
         import yaml
-        kwargs = get_object_kwargs(options)
+        kwargs = get_deserial_kwargs(options)
         return from_object(obj, yaml.safe_load(raw, **options), **kwargs)
 
 class TomlSerial(Serializer[str]):
@@ -69,7 +80,8 @@ class TomlSerial(Serializer[str]):
     @classmethod
     def serialize(cls, obj: Type, **options) -> str:
         import toml
-        return toml.dumps(to_dict(obj), **options)
+        kwargs = get_serial_kwargs(options)
+        return toml.dumps(to_dict(obj, **kwargs), **options)
 
 class TomlDeserial(Deserializer[str]):
     """"""
@@ -77,5 +89,21 @@ class TomlDeserial(Deserializer[str]):
     @classmethod
     def deserialize(cls, obj: Type[T], raw: str, **options) -> T:
         import toml
-        kwargs = get_object_kwargs(options)
+        kwargs = get_deserial_kwargs(options)
         return from_object(obj, toml.loads(raw, **options), **kwargs)
+
+class XmlSerial(Serializer[str]):
+    """"""
+
+    @classmethod
+    def serialize(cls, obj: Type, **options) -> str:
+        from . import xml
+        return xml.to_string(obj, **options)
+
+class XmlDeserial(Deserializer[str]):
+    """"""
+
+    @classmethod
+    def deserialize(cls, obj: Type[T], raw: str, **options) -> T:
+        from . import xml
+        return xml.from_string(obj, raw, **options)

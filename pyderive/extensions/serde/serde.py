@@ -1,8 +1,10 @@
 """
 Serde Serialization/Deserialization Tools/Baseclasses
 """
+import ipaddress
 from abc import abstractmethod
 from typing import *
+from typing_extensions import get_origin, get_args
 
 from ... import BaseField
 from ...abc import MISSING, FieldDef, InitVar, has_default
@@ -29,6 +31,8 @@ __all__ = [
 
     'SerdeParams',
     'SerdeField',
+    'TypeEncoder',
+    'TypeDecoder',
     'Serializer',
     'Deserializer',
 ]
@@ -39,6 +43,9 @@ D = TypeVar('D', contravariant=True)
 
 #: skip function typehint
 SkipFunc = Callable[[Any], bool]
+
+#: supported base python types
+SUPPORTED_TYPES = {str, int, float, complex, list, tuple, set}
 
 #: serde validation tracker
 SERDE_PARAMS_ATTR = '__serde_params__'
@@ -133,13 +140,54 @@ def is_sequence(value: Any) -> bool:
     """return true if the given value is a valid sequence"""
     return isinstance(value, (set, Sequence)) and not isinstance(value, str)
 
-def _parse_object(anno: Type, value: Any, **kwargs) -> Any:
+def _unexpected(name: str, anno: Type, value: Any):
+    """raise unexpected type error when parsing objects"""
+    return ValueError(
+        f'Field: {name!r} Expected: {anno!r}, Got: {type(value)!r}')
+
+def _parse_object(name: str, 
+    anno: Type, value: Any, decoder: 'TypeDecoder', **kwargs) -> Any:
     """recursively parse dataclass annotation"""
+    # handle dataclass parsing
     if is_dataclass(anno):
         if is_sequence(value):
-            return from_sequence(anno, value, **kwargs)
+            return from_sequence(anno, value, decoder, **kwargs)
         elif isinstance(value, Mapping):
-            return from_mapping(anno, value, **kwargs)
+            return from_mapping(anno, value, decoder, **kwargs)
+    # handle named-tuples
+    if isinstance(anno, type) and issubclass(anno, tuple):
+        if not is_sequence(value):
+            raise _unexpected(name, anno, value)
+        return anno(*value)
+    # handle defined dictionary types
+    origin = get_origin(anno)
+    if origin in (dict, Mapping):
+        # raise error if value does not match annotation
+        if not isinstance(value, (dict, Mapping)):
+            raise _unexpected(name, anno, value)
+        # parse key/value items
+        result       = {}
+        kname, vname = f'{name}[key]', f'{name}[val]'
+        kanno, vanno = get_args(anno)
+        for k,v in value.items():
+            k = _parse_object(kname, kanno, k, **kwargs)
+            v = _parse_object(vname, vanno, v, **kwargs)
+            result[k] = v
+        return type(value)(result) # type: ignore
+    # handle defined sequence types
+    if origin in (list, set, tuple, Sequence):
+        # raise error if value does not match annotation
+        if not is_sequence(value):
+            raise _unexpected(name, anno, value)
+        # parse sequence items
+        ianno  = get_args(anno)[0]
+        result = []
+        for n, item in enumerate(value, 0):
+            item = _parse_object(f'{name}[{n}]', ianno, item, decoder, **kwargs)
+            result.append(item)
+        return type(value)(result)
+    if value not in SUPPORTED_TYPES:
+        return decoder.default(anno, value)
     return value
 
 def _has_skip(field: FieldDef) -> int:
@@ -151,14 +199,16 @@ def _has_skip(field: FieldDef) -> int:
             return 1
     return 2
 
-def from_sequence(cls: Type[T], values: Union[Sequence, Set], **kwargs) -> T:
+def from_sequence(cls: Type[T], 
+    values: Union[Sequence, Set], decoder: 'TypeDecoder', **kwargs) -> T:
     """
     parse sequence into a valid dataclasss object
 
-    :param cls:      validation capable dataclass object
-    :param values:   sequence to parse into valid dataclass object
-    :param kwargs:   additional arguments to pass to recursive evaluation
-    :return:         parsed dataclass object
+    :param cls:     validation capable dataclass object
+    :param values:  sequence to parse into valid dataclass object
+    :param decoder: decoder helper used for deserialization
+    :param kwargs:  additional arguments to pass to recursive evaluation
+    :return:        parsed dataclass object
     """
     # validate dataclass and serde information
     if not is_dataclass(cls) and not isinstance(cls, type):
@@ -181,18 +231,19 @@ def from_sequence(cls: Type[T], values: Union[Sequence, Set], **kwargs) -> T:
     # iterate values and try to match to annotations
     attrs = {}
     for field, value in zip(fields, values):
-        value = _parse_object(field.anno, value, **kwargs)
+        value = _parse_object(field.name, field.anno, value, decoder, **kwargs)
         if not skip_field(field, value):
             attrs[field.name] = value
     return cls(**attrs)
 
-def from_mapping(cls: Type[T], 
-    values: Mapping, *, allow_unknown: bool = False, **kwargs) -> T:
+def from_mapping(cls: Type[T], values: Mapping, 
+    decoder: 'TypeDecoder', *, allow_unknown: bool = False, **kwargs) -> T:
     """
     parse mapping into a valid dataclass object
 
     :param cls:           validation capable dataclass object
     :param values:        sequence to parse into valid dataclass object
+    :param decoder:       decoder helper used for deserialization
     :param allow_unknown: allow for unknown and invalid keys during dict parsing
     :param kwargs:        additional arguments to pass to recursive evaluation
     :return:              parsed dataclass object
@@ -214,117 +265,79 @@ def from_mapping(cls: Type[T],
             raise KeyError(f'Unknown Key: {key!r}')
         # translate value based on annotation
         field = fdict[key]
+        name  = field.name
         if skip_field(field, value):
             continue
-        attrs[field.name] = _parse_object(field.anno, value, **kwargs)
+        attrs[name] = _parse_object(name, field.anno, value, decoder, **kwargs)
     return cls(**attrs)
 
-def from_object(cls: Type[T], value: Any, **kwargs) -> T:
+def from_object(cls: Type[T], 
+    value: Any, decoder: Optional['TypeDecoder'] = None, **kwargs) -> T:
     """
     parse an object into a valid dataclass instance
 
-    :param cls:    validation capable dataclass object
-    :param values: object into valid dataclass object
-    :param kwargs: additional arguments to pass to recursive evaluation
-    :return:       parsed dataclass object
+    :param cls:     validation capable dataclass object
+    :param values:  object into valid dataclass object
+    :param decoder: decoder helper used for deserialization
+    :param kwargs:  additional arguments to pass to recursive evaluation
+    :return:        parsed dataclass object
     """
     if not is_dataclass(cls) and not isinstance(cls, type):
         raise TypeError(f'Cannot construct non-dataclass instance!')
+    decoder = decoder or TypeDecoder()
     if is_sequence(value):
-        return from_sequence(cls, value, **kwargs)
+        return from_sequence(cls, value, decoder, **kwargs)
     elif isinstance(value, Mapping):
-        return from_mapping(cls, value, **kwargs)
+        return from_mapping(cls, value, decoder, **kwargs)
     raise TypeError(f'Cannot deconstruct: {value!r}')
 
-#TODO: asdict/astuple current method is unsustainable and does not work for complex
-# data types.
-
-#TODO: ensure asdict/astuple works with lists/sequences of dataclass objects
-#TODO: improve and complete from-xml function
-
-def _get_dataclasses(cls) -> List[Type]:
-    """get dataclass instances within self and fields in reverse order"""
-    start, final = [cls.__class__], []
-    while start:
-        item = start.pop(0)
-        if not is_dataclass(item):
-            continue
-        final.insert(0, item)
-        for field in fields(item):
-            start.append(field.anno)
-    return final
-
-def _gen_dict_factory(cls) -> DictFactory:
+def _dict_factory(cls, items: List[Tuple[str, Any]]) -> dict:
     """generate custom dictionary-factory"""
-    fdict = {f.name:f for f in fields(cls)}
-    def factory(items: List[Tuple[str, Any]]) -> Dict:
-        output = {}
-        for name, value in items:
-            if name not in fdict:
-                raise KeyError(f'{cls.__name__!r} Unexpected Key: {name!r}')
-            field = fdict[name]
-            if skip_field(field, value):
-                continue
-            name = field.metadata.get(RENAME_ATTR) or name
-            output[name] = value
-        return output
-    return factory
+    fdict  = {f.name:f for f in fields(cls)}
+    output = {}
+    for name, value in items:
+        field = fdict[name]
+        if skip_field(field, value):
+            continue
+        name = field.metadata.get(RENAME_ATTR) or name
+        output[name] = value
+    return output
 
-def _gen_tuple_factory(cls) -> TupleFactory:
+def _tuple_factory(cls, items: List[Any]) -> tuple:
     """generate custom tuple-factory"""
+    output    = []
     fielddefs = fields(cls)
-    def factory(items: List[Any]) -> Tuple:
-        output = []
-        for field, item in zip(fielddefs, items):
-            if skip_field(field, item):
-                continue
-            output.append(item)
-        return tuple(output)
-    return factory
+    for field, item in zip(fielddefs, items):
+        if skip_field(field, item):
+            continue
+        output.append(item)
+    return tuple(output)
 
-def to_dict(cls) -> Dict[str, Any]:
+def to_dict(cls, encoder: Optional['TypeEncoder'] = None) -> Dict[str, Any]:
     """
     convert dataclass instance to dictionary following serde skip rules
 
-    :param cls: dataclass instance to convert to dictionary
-    :return:    dictionary representing dataclass object
+    :param cls:     dataclass instance to convert to dictionary
+    :param encoder: optional encoder instance for encoding objects
+    :return:        dictionary representing dataclass object
     """
     if not is_dataclass(cls) or isinstance(cls, type):
         raise TypeError(f'Cannot construct non-dataclass instance!')
-    # get flattend list of dataclasses in reverse order of appearance
-    # and convert them to custom dictionary factories
-    dataclasses = _get_dataclasses(cls)
-    factories   = map(_gen_dict_factory, dataclasses)
-    def dict_factory(items):
-        """iterate factories to parse relevant items"""
-        try:
-            factory = next(factories)
-            return factory(items)
-        except StopIteration:
-            raise ValueError(f'Unexpected Items: {items!r}') from None
-    return asdict(cls, dict_factory=dict_factory)
+    encoder = encoder or TypeEncoder()
+    return asdict(cls, encoder=encoder.default, dict_factory=_dict_factory)
 
-def to_tuple(cls) -> Tuple:
+def to_tuple(cls, encoder: Optional['TypeEncoder'] = None) -> Tuple:
     """
     convert dataclass instance to tuple following serde skip rules
 
-    :param cls: dataclass instance to convert to tuple
-    :return:    tuple representing dataclass object
+    :param cls:     dataclass instance to convert to tuple
+    :param encoder: optional encoder instance for encoding objects
+    :return:        tuple representing dataclass object
     """
     if not is_dataclass(cls) or isinstance(cls, type):
         raise TypeError(f'Cannot construct non-dataclass instance!')
-    # get flattend list of dataclasses in reverse order of appearance
-    # and convert them to custom dictionary factories
-    dataclasses = _get_dataclasses(cls)
-    factories   = map(_gen_tuple_factory, dataclasses)
-    def tuple_factory(items):
-        """iterate factories to parse relevant items"""
-        try:
-            factory = next(factories)
-            return factory(items)
-        except StopIteration:
-            raise ValueError(f'Unexpected Items: {items!r}') from None
-    return astuple(cls, tuple_factory=tuple_factory)
+    encoder = encoder or TypeEncoder()
+    return astuple(cls, encoder=encoder.default, tuple_factory=_tuple_factory)
 
 #** Classes **#
 
@@ -336,20 +349,43 @@ class SerdeParams:
 @dataclass
 class SerdeField(BaseField):
     """serde dataclass field definition"""
-    rename:       InitVar[Optional[str]]      = None
-    skip:         InitVar[bool]               = False
-    skip_if:      InitVar[Optional[SkipFunc]] = None
-    skip_if_not:  InitVar[bool]               = False
-    skip_default: InitVar[bool]               = False
+    rename:       InitVar[Optional[str]]       = None
+    aliases:      InitVar[Optional[List[str]]] = None
+    skip:         InitVar[bool]                = False
+    skip_if:      InitVar[Optional[SkipFunc]]  = None
+    skip_if_not:  InitVar[bool]                = False
+    skip_default: InitVar[bool]                = False
 
-    def __post_init__(self, rename, skip, skip_if, skip_if_not, skip_default):
+    def __post_init__(self, 
+        rename, aliases, skip, skip_if, skip_if_not, skip_default):
         self.metadata.update({
             RENAME_ATTR:       rename,
+            ALIASES_ATTR:      aliases or [],
             SKIP_ATTR:         skip,
             SKIP_IF_ATTR:      skip_if,
             SKIP_IFFALSE_ATTR: skip_if_not,
             SKIP_DEFAULT_ATTR: skip_default,
         })
+
+class TypeEncoder:
+    """Object Type Encoder"""
+
+    def default(self, obj: Any) -> Any:
+        """handle common python types"""
+        if is_sequence(obj):
+            return type(obj)([self.default(v) for v in obj])
+        if isinstance(obj, (ipaddress.IPv4Address, ipaddress.IPv6Address)):
+            return str(obj)
+        return obj
+
+class TypeDecoder:
+    """Object Type Decoder"""
+
+    def default(self, anno: Type, obj: Any) -> Any:
+        """handle common python types"""
+        if isinstance(anno, (ipaddress.IPv4Address, ipaddress.IPv6Address)):
+            return ipaddress.ip_address(anno)
+        return obj
 
 class Serializer(Protocol[S]):
     """Serializer Interface Definition"""

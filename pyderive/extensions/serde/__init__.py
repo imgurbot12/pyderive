@@ -20,6 +20,8 @@ __all__ = [
     'from_object',
     'to_dict',
     'to_tuple',
+    'TypeEncoder',
+    'TypeDecoder',
     'Serializer',
     'Deserializer',
 
@@ -33,6 +35,7 @@ SERIALIZER_IMPL: Dict[str, Serializer] = {
     'json': JsonSerial,
     'yaml': YamlSerial,
     'toml': TomlSerial,
+    'xml':  XmlSerial,
 }
 
 #: global registry of supported deserializer formats
@@ -40,6 +43,7 @@ DESERIALIZER_IMPL: Dict[str, Deserializer] = {
     'json': JsonDeserial,
     'yaml': YamlDeserial,
     'toml': TomlDeserial,
+    'xml':  XmlDeserial,
 }
 
 #** Functions **#
@@ -175,21 +179,21 @@ class Serialize:
     def __init_subclass__(cls, **kwargs):
         _init_subclass(cls, **kwargs)
 
-    def asdict(self) -> Dict[str, Any]:
+    def asdict(self, **kwargs) -> Dict[str, Any]:
         """
         convert instance to dictionary
 
         :return: dictionary of original object
         """
-        return to_dict(self)
+        return to_dict(self, **kwargs)
 
-    def astuple(self) -> Tuple:
+    def astuple(self, **kwargs) -> Tuple:
         """
         convert instance to tuple
 
         :return: tuple of orignal object
         """
-        return to_tuple(self)
+        return to_tuple(self, **kwargs)
  
     def serialize(self, *args, **kwargs):
         """
@@ -203,29 +207,37 @@ class Serialize:
             serde(self.__class__)
         return serialize(self, *args, **kwargs)
 
-    def to_json(self) -> str:
+    def to_json(self, **kwargs) -> str:
         """
         serialize self as json dictionary
 
         :return: dataclass encoded as json string
         """
-        return self.serialize('json')
+        return self.serialize('json', **kwargs)
 
-    def to_yaml(self) -> str:
+    def to_yaml(self, **kwargs) -> str:
         """
         serialize self as yaml object
 
         :return: dataclass encoded as yaml string
         """
-        return self.serialize('yaml')
+        return self.serialize('yaml', **kwargs)
 
-    def to_toml(self) -> str:
+    def to_toml(self, **kwargs) -> str:
         """
         serialize self as toml object
 
         :return: dataclass encoded as toml string
         """
-        return self.serialize('toml')
+        return self.serialize('toml', **kwargs)
+
+    def to_xml(self, **kwargs) -> str:
+        """
+        serialize self as xml object
+
+        :return: dataclass encoded as xml string
+        """
+        return self.serialize('xml', **kwargs)
 
 @dataclass_transform()
 class Deserialize:
@@ -283,6 +295,15 @@ class Deserialize:
         :return: decoded dataclass object
         """
         return cls.deserialize(toml, 'toml', **kwargs)
+
+    @classmethod
+    def from_xml(cls, toml: Union[str, bytes], **kwargs) -> Self:
+        """
+        deserialize self from xml string
+        
+        :return: decoded dataclass object
+        """
+        return cls.deserialize(toml, 'xml', **kwargs)
 
 @dataclass_transform()
 class Serde(Serialize, Deserialize):
