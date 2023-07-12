@@ -50,8 +50,8 @@ __all__ = [
 
 #** Classes **#
 
-@dataclass(recurse=True)
-class BaseField(FieldDef):
+@dataclass(recurse=True, init=True)
+class BaseField(Field):
     """dataclass field instance w/ better defaults"""
     name:            str            = ''
     anno:            Type           = type

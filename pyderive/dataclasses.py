@@ -17,7 +17,10 @@ __all__ = [
     'MISSING', 
     'DataClassLike',
     'FrozenInstanceError',
- 
+    
+    'TupleFactory',
+    'DictFactory',
+
     'is_dataclass',
     'field', 
     'fields',
@@ -25,6 +28,12 @@ __all__ = [
     'asdict',
     'dataclass'
 ]
+
+#: tuple factory
+TupleFactory = Callable[[Any], Tuple]
+
+#: dictionary factory
+DictFactory  = Callable[[Any], Dict]
 
 #: dataclass fields attribute
 FIELD_ATTR = '__datafields__'
@@ -99,7 +108,7 @@ def fields(cls, all_types: bool = False):
         fields = [f for f in fields if f.field_type == FieldType.STANDARD]
     return fields
 
-def _astuple_inner(obj, rec: int, factory: Type[tuple], lvl: int) -> Any:
+def _astuple_inner(obj, rec: int, factory: TupleFactory, lvl: int) -> Any:
     """inner tuple-ify function to convert dataclass fields to tuple"""
     # stop recursin after limit
     if rec > 0 and lvl >= rec:
@@ -126,7 +135,7 @@ def _astuple_inner(obj, rec: int, factory: Type[tuple], lvl: int) -> Any:
     else:
         return copy.deepcopy(obj)
 
-def astuple(cls, *, recurse: int = 0, tuple_factory: Type[tuple] = tuple) -> tuple:
+def astuple(cls, *, recurse: int = 0, tuple_factory: TupleFactory = tuple) -> tuple:
     """
     convert dataclass object into dictionary of field-values
 
@@ -137,7 +146,7 @@ def astuple(cls, *, recurse: int = 0, tuple_factory: Type[tuple] = tuple) -> tup
         raise TypeError('astuple() should be called on dataclass instances')
     return _astuple_inner(cls, recurse, tuple_factory, 0)
 
-def _asdict_inner(obj, rec: int, factory: Type[dict], lvl: int) -> Any:
+def _asdict_inner(obj, rec: int, factory: DictFactory, lvl: int) -> Any:
     """inner dictionary-ify function to convert dataclass fields into dict"""
     # stop recursin after limit
     if rec > 0 and lvl >= rec:
@@ -164,7 +173,7 @@ def _asdict_inner(obj, rec: int, factory: Type[dict], lvl: int) -> Any:
     else:
         return copy.deepcopy(obj) 
 
-def asdict(cls, *, recurse: int = 0, dict_factory: Type[dict] = dict) -> dict:
+def asdict(cls, *, recurse: int = 0, dict_factory: DictFactory = dict) -> dict:
     """
     convert dataclass object into dictionary of field-values
 

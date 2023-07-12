@@ -5,6 +5,7 @@ from enum import Enum
 from typing import *
 from typing_extensions import Annotated, get_origin, get_args
 
+from ..serde import is_sequence
 from ...abc import FieldDef, FieldValidator
 
 #** Variables **#
@@ -41,10 +42,6 @@ def _wrap(name: str) -> Callable[[Callable], Callable]:
         func.__qualname__ = func.__name__
         return func
     return wrapper
-
-def is_sequence(value: Any) -> bool:
-    """return true if the given value is a valid sequence"""
-    return isinstance(value, (set, Sequence)) and not isinstance(value, str)
 
 def none_validator(value: Any):
     """
@@ -177,7 +174,7 @@ def enum_validator(anno: Type[Enum], typecast: bool) -> TypeValidator:
         if typecast:
             try:
                 return anno[value]
-            except (ValueError, ValidationError):
+            except (KeyError, ValueError, ValidationError):
                 pass
             try:
                 return anno(value)
