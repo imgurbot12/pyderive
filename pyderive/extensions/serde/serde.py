@@ -165,7 +165,7 @@ def _parse_tuple(name: str, anno: Type, names: Sequence[str],
     args: Sequence[Type], value: Any, decoder: 'TypeDecoder', kwargs) -> tuple:
     """parse tuple value according to annotation"""
     # raise error if value does not match annotation
-    if not is_sequence(value) or len(value) != len(args):
+    if not is_sequence(value):
         raise _unexpected(name, anno, value)
     # parse values according
     result = []
@@ -257,7 +257,7 @@ def from_sequence(cls: Type[T],
     # check range of parameters
     fields = getattr(cls, FIELD_ATTR)
     if len(values) > len(fields):
-        raise TypeError(f'{cls.__name__}: sequence contains too many values.')
+        raise SerdeError(f'{cls.__name__}: sequence contains too many values.')
     # limit number of fields to required components
     if len(values) < len(fields):
         required = [f for f in fields if not has_default(f)]

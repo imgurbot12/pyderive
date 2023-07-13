@@ -187,10 +187,6 @@ def _fromxml_inner(pos: int, anno: Type, elem: 'Element', args: tuple) -> Any:
     if anno_is_namedtuple(anno):
         # manually collect annotations from named-tuple
         _, vannos = namedtuple_annos(anno)
-        if len(vannos) < len(elem):
-            raise ValueError(f'Too Few Elements for NamedTuple: {anno!r}')
-        if len(vannos) > len(elem):
-            raise ValueError(f'Too Many Elements for NamedTuple: {anno!r}')
         result = {}
         for pos, (vanno, child) in enumerate(zip(vannos, elem), 0):
             key   = child.tag
@@ -205,9 +201,7 @@ def _fromxml_inner(pos: int, anno: Type, elem: 'Element', args: tuple) -> Any:
     # handle defined tuples
     if origin is tuple:
         iannos = get_args(anno)
-        if len(iannos) <= pos:
-            raise ValueError(f'Too Many Elements for Tuple: {anno!r}')
-        ianno = iannos[pos]
+        ianno = iannos[pos] if pos < len(iannos) else str
         return (_fromxml_inner(pos, ianno, elem, args), )
     # handle defined dictionaries
     if origin in (dict, Mapping):
