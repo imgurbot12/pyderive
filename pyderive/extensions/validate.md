@@ -25,6 +25,42 @@ print(foo)
 foo2 = Foo('1', True)
 ```
 
+Custom Validators
+
+```python
+from pyderive.extensions.validate import *
+from typing_extensions import Annotated
+
+def str_validator(value: str) -> str:
+    if value == 'example':
+        raise ValidationError('Cannot use Example!')
+    return value
+
+def custom_validator(value: 'CustomType') -> 'CustomType':
+    if not isinstance(value.a, str):
+        raise ValidationError('CustomType.a must be a string!')
+    return value
+
+class CustomType:
+    def __init__(self, a: str):
+        self.a = a
+
+@validate(slots=True) # make dataclass if not already
+class Foo:
+    a: int
+    b: CustomType
+    # add validator via the `Annotated` type
+    c: Annotated[str, Validator[str_validator]]
+
+foo = Foo(1, CustomType('ok'), 'test')
+
+# register validator for specific type
+register_validator(CustomType, custom_validator)
+
+# raises error w/ custom validators
+foo2 = Foo(1, CustomType('ok'), 'example')
+```
+
 MetaClass Option over Decorators
 
 ```python
