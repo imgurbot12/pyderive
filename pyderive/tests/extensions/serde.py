@@ -1,7 +1,7 @@
 """
 PyDerive Validation Extension UnitTests
 """
-from typing import Any, Dict, List, Tuple, Type
+from typing import Any, Dict, List, NamedTuple, Tuple, Type
 from unittest import TestCase
 
 from ...extensions.serde import *
@@ -54,7 +54,34 @@ class SerdeTests(TestCase):
         self.assertSerial(foo, 'json', '{"a": 1, "b": "text"}')
         self.assertSerial(foo, 'yaml', 'a: 1\nb: text\n')
         self.assertSerial(foo, 'toml', 'a = 1\nb = "text"\n')
- 
+        self.assertSerial(foo, 'xml', "<?xml version='1.0' encoding='utf-8'?>\n<Foo><a>1</a><b>text</b></Foo>")
+    
+    def test_serialize_complex(self):
+        """ensure more complex serialization functions work as intended"""
+        class Bar(Serde):
+            plot:  Dict[str, int]
+            scale: List[float]
+        class Baz(NamedTuple):
+            x: int
+            y: int
+        class Foo(Serde):
+            data: Tuple[bool, float, Baz]
+            bars: Dict[str, Bar]
+            tups: List[Baz]
+        bar1 = Bar({'a': 1, 'b': 2}, [1.1, 2.2])
+        bar2 = Bar({'c': 3, 'd': 4}, [3.3, 4.4])
+        foo  = Foo((True, 6.9, Baz(1, 2)), {'bar1': bar1, 'bar2': bar2}, [Baz(3, 4), Baz(5, 6)])
+        dfoo = foo.asdict()
+        tfoo = foo.astuple()
+        fooj = foo.to_json()
+        fooy = foo.to_yaml()
+        foox = foo.to_xml()
+        self.assertEqual(Foo.from_object(dfoo), foo)
+        self.assertEqual(Foo.from_object(tfoo), foo)
+        self.assertEqual(Foo.from_json(fooj), foo)
+        self.assertEqual(Foo.from_yaml(fooy), foo)
+        self.assertEqual(Foo.from_xml(foox), foo)
+
     def test_rename(self):
         """ensure `rename` field option works as intended"""
         class Foo(Serialize):

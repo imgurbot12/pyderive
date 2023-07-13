@@ -23,12 +23,15 @@ __all__ = [
     'field_dict',
     'skip_field',
     'is_sequence',
+    'anno_is_namedtuple',
+    'namedtuple_annos',
     'from_sequence',
     'from_mapping',
     'from_object',
     'to_dict',
     'to_tuple',
 
+    'SerdeError',
     'SerdeParams',
     'SerdeField',
     'TypeEncoder',
@@ -45,7 +48,7 @@ D = TypeVar('D', contravariant=True)
 SkipFunc = Callable[[Any], bool]
 
 #: supported base python types
-SUPPORTED_TYPES = {str, int, float, complex, list, tuple, set}
+SUPPORTED_TYPES = [str, bool, int, float, complex, list, tuple, set, frozenset]
 
 #: serde validation tracker
 SERDE_PARAMS_ATTR = '__serde_params__'
@@ -75,11 +78,11 @@ def validate_serde(cls: Type):
         name = field.name
         newname = field.metadata.get(RENAME_ATTR) or field.name
         if newname in names:
-            raise ValueError(f'rename: {newname!r} already reserved.')
+            raise SerdeError(f'rename: {newname!r} already reserved.')
         names.add(newname)
         for alias in field.metadata.get(ALIASES_ATTR, []):
             if alias in names:
-                raise ValueError(f'alias: {alias!r} already reserved.')
+                raise SerdeError(f'alias: {alias!r} already reserved.')
             names.add(alias)
         # validate skip settings
         skip         = field.metadata.get(SKIP_ATTR)
@@ -87,14 +90,14 @@ def validate_serde(cls: Type):
         skip_if_not  = field.metadata.get(SKIP_IFFALSE_ATTR)
         skip_default = field.metadata.get(SKIP_DEFAULT_ATTR)
         if skip and skip_if:
-            raise ValueError(f'field: {name!r} cannot use skip_if w/ skip')
+            raise SerdeError(f'field: {name!r} cannot use skip_if w/ skip')
         if skip and skip_if_not:
-            raise ValueError(f'field: {name!r} cannot use skip_if_false w/ skip')
+            raise SerdeError(f'field: {name!r} cannot use skip_if_false w/ skip')
         if skip and skip_default:
-            raise ValueError(f'field: {name!r} cannot use skip_default w/ skip')
+            raise SerdeError(f'field: {name!r} cannot use skip_default w/ skip')
         if not has_default(field) \
             and any((skip, skip_if, skip_if_not, skip_default)):
-            raise ValueError(f'field: {name!r} cannot offer skip w/o default')
+            raise SerdeError(f'field: {name!r} cannot offer skip w/o default')
     # set/update parameters
     params = getattr(cls, SERDE_PARAMS_ATTR, None) or SerdeParams()
     params.bases.add(cls)
@@ -140,13 +143,39 @@ def is_sequence(value: Any) -> bool:
     """return true if the given value is a valid sequence"""
     return isinstance(value, (set, Sequence)) and not isinstance(value, str)
 
+def anno_is_namedtuple(anno) -> bool:
+    """return true if the given annotation is a named tuple"""
+    return isinstance(anno, type) \
+        and issubclass(anno, tuple) \
+        and hasattr(anno, '_fields')
+
+def namedtuple_annos(anno: Type) -> Tuple[List[str], Tuple[Type, ...]]:
+    """retrieve annotations for the given tuple"""
+    fields   = getattr(anno, '_fields')
+    annodict = getattr(anno, '__annotations__', {})
+    args     = [annodict.get(field, str) for field in fields]
+    return (fields, tuple(args))
+
 def _unexpected(name: str, anno: Type, value: Any):
     """raise unexpected type error when parsing objects"""
-    return ValueError(
+    return SerdeError(
         f'Field: {name!r} Expected: {anno!r}, Got: {type(value)!r}')
 
+def _parse_tuple(name: str, anno: Type, names: Sequence[str],
+    args: Sequence[Type], value: Any, decoder: 'TypeDecoder', kwargs) -> tuple:
+    """parse tuple value according to annotation"""
+    # raise error if value does not match annotation
+    if not is_sequence(value) or len(value) != len(args):
+        raise _unexpected(name, anno, value)
+    # parse values according
+    result = []
+    for (name, ianno, item) in zip(names, args, value):
+        item = _parse_object(name, ianno, item, decoder, kwargs)
+        result.append(item)
+    return tuple(result)
+
 def _parse_object(name: str, 
-    anno: Type, value: Any, decoder: 'TypeDecoder', **kwargs) -> Any:
+    anno: Type, value: Any, decoder: 'TypeDecoder', kwargs: dict) -> Any:
     """recursively parse dataclass annotation"""
     # handle dataclass parsing
     if is_dataclass(anno):
@@ -155,10 +184,9 @@ def _parse_object(name: str,
         elif isinstance(value, Mapping):
             return from_mapping(anno, value, decoder, **kwargs)
     # handle named-tuples
-    if isinstance(anno, type) and issubclass(anno, tuple):
-        if not is_sequence(value):
-            raise _unexpected(name, anno, value)
-        return anno(*value)
+    if anno_is_namedtuple(anno):
+        names, args = namedtuple_annos(anno)
+        return _parse_tuple(name, anno, names, args, value, decoder, kwargs)
     # handle defined dictionary types
     origin = get_origin(anno)
     if origin in (dict, Mapping):
@@ -170,12 +198,19 @@ def _parse_object(name: str,
         kname, vname = f'{name}[key]', f'{name}[val]'
         kanno, vanno = get_args(anno)
         for k,v in value.items():
-            k = _parse_object(kname, kanno, k, **kwargs)
-            v = _parse_object(vname, vanno, v, **kwargs)
+            k = _parse_object(kname, kanno, k, decoder, kwargs)
+            v = _parse_object(vname, vanno, v, decoder, kwargs)
             result[k] = v
         return type(value)(result) # type: ignore
+    # handle defined tuple sequences
+    if origin is tuple:
+        # raise error if value does not match annotation
+        args  = get_args(anno)
+        names = [f'{name}[{n}]' for n in range(0, len(args))]
+        return _parse_tuple(name, anno, names, args, value, decoder, kwargs)
     # handle defined sequence types
-    if origin in (list, set, tuple, Sequence):
+    if origin in (list, set, Sequence):
+        oanno = list if not origin or origin is Sequence else origin
         # raise error if value does not match annotation
         if not is_sequence(value):
             raise _unexpected(name, anno, value)
@@ -183,11 +218,15 @@ def _parse_object(name: str,
         ianno  = get_args(anno)[0]
         result = []
         for n, item in enumerate(value, 0):
-            item = _parse_object(f'{name}[{n}]', ianno, item, decoder, **kwargs)
+            item = _parse_object(f'{name}[{n}]', ianno, item, decoder, kwargs)
             result.append(item)
-        return type(value)(result)
+        return oanno(result)
+    # allow for custom decoding on arbritrary types
     if value not in SUPPORTED_TYPES:
         return decoder.default(anno, value)
+    # allow for typecasting when value type does not match
+    if anno in SUPPORTED_TYPES and type(value) != anno:
+        return anno(value)
     return value
 
 def _has_skip(field: FieldDef) -> int:
@@ -231,7 +270,7 @@ def from_sequence(cls: Type[T],
     # iterate values and try to match to annotations
     attrs = {}
     for field, value in zip(fields, values):
-        value = _parse_object(field.name, field.anno, value, decoder, **kwargs)
+        value = _parse_object(field.name, field.anno, value, decoder, kwargs)
         if not skip_field(field, value):
             attrs[field.name] = value
     return cls(**attrs)
@@ -262,13 +301,13 @@ def from_mapping(cls: Type[T], values: Mapping,
         if key not in fdict:
             if allow_unknown:
                 continue
-            raise KeyError(f'Unknown Key: {key!r}')
+            raise SerdeError(f'Unknown Key: {key!r}')
         # translate value based on annotation
         field = fdict[key]
         name  = field.name
         if skip_field(field, value):
             continue
-        attrs[name] = _parse_object(name, field.anno, value, decoder, **kwargs)
+        attrs[name] = _parse_object(name, field.anno, value, decoder, kwargs)
     return cls(**attrs)
 
 def from_object(cls: Type[T], 
@@ -340,6 +379,10 @@ def to_tuple(cls, encoder: Optional['TypeEncoder'] = None) -> Tuple:
     return astuple(cls, encoder=encoder.default, tuple_factory=_tuple_factory)
 
 #** Classes **#
+
+class SerdeError(ValueError):
+    """Custom ValueError Exception"""
+    pass
 
 @dataclass(slots=True)
 class SerdeParams:

@@ -2,6 +2,7 @@
 Serializer/Deserialzer Implementations
 """
 import json
+from functools import lru_cache
 from typing import Type
 
 from .serde import *
@@ -58,10 +59,22 @@ class JsonDeserial(Deserializer[str]):
 
 class YamlSerial(Serializer[str]):
     """"""
+    
+    @classmethod
+    def serialize_tuple(cls, dumper, tup):
+        """serialize named-tuples properly"""
+        return dumper.represent_list(tup)
+
+    @classmethod
+    @lru_cache(maxsize=None)
+    def import_yaml(cls):
+        import yaml
+        yaml.SafeDumper.yaml_multi_representers[tuple] = cls.serialize_tuple
+        return yaml
 
     @classmethod
     def serialize(cls, obj: Type, **options) -> str:
-        import yaml
+        yaml   = cls.import_yaml()
         kwargs = get_serial_kwargs(options)
         return yaml.safe_dump(to_dict(obj, **kwargs), **options)
 

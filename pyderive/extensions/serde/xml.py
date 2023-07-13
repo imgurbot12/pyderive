@@ -6,8 +6,10 @@ import importlib
 from typing import *
 from typing_extensions import get_origin, get_args
 
-from .serde import T, RENAME_ATTR, field_dict, skip_field, is_sequence
+from .serde import *
+from .serde import RENAME_ATTR
 from ...dataclasses import is_dataclass, fields
+from .serde import SUPPORTED_TYPES
 
 #** Variables **#
 __all__ = ['xml_allow_attr', 'to_xml', 'from_xml', 'from_string', 'to_string']
@@ -16,7 +18,7 @@ ToStringFunc   = Callable[['Element'], str]
 FromStringFunc = Callable[[str], 'Element']
 
 #: types allowed as xml attributes
-ALLOWED_ATTRS: Set[Type] = {str, int, float, complex}
+ALLOWED_ATTRS: Set[Type] = {str, bool, int, float, complex}
 
 #** Functions **#
 
@@ -58,6 +60,10 @@ def to_xml(cls, use_attrs: bool = False, include_types: bool = False) -> 'Elemen
     _asxml_inner(root, root.tag, cls, 0, 0, use_attrs, include_types)
     return next(iter(root))
 
+def _is_namedtuple(value: Any) -> bool:
+    """return true if value is a named tuple instance"""
+    return isinstance(value, tuple) and hasattr(value, '_fields')
+
 def _asxml_inner(
     root:     'Element', 
     name:     str, 
@@ -93,7 +99,7 @@ def _asxml_inner(
             _asxml_inner(elem, name, attr, rec, lvl, attrs, use_type)
         root.append(elem)
     # named-tuple
-    elif isinstance(obj, tuple) and hasattr(obj, '_fields'):
+    elif _is_namedtuple(obj):
         elem  = ElementFactory(name)
         names = getattr(obj, '_fields')
         for fname, value in zip(names, obj):
@@ -133,7 +139,7 @@ def from_xml(cls: Type[T],
     # iterate children to match to fields
     fdict  = field_dict(cls)
     kwargs = {}
-    for elem in root:
+    for pos, elem in enumerate(root, 0):
         # ensure tag matches existing field
         if elem.tag not in fdict:
             if allow_unused:
@@ -141,26 +147,34 @@ def from_xml(cls: Type[T],
             raise ValueError(f'{cls.__name__!r} Unexpected Tag: {elem.tag!r}')
         # assign xml according to field annotation
         field = fdict[elem.tag]
-        value = _fromxml_inner(field.anno, elem, allow_unused, use_attrs)
-        if is_sequence(value):
-            kwargs.setdefault(field.name, type(value)())
+        value = _fromxml_inner(pos, field.anno, elem, (allow_unused, use_attrs))
+        if is_sequence(value) and not _is_namedtuple(value):
+            kwargs.setdefault(field.name, [])
             kwargs[field.name].extend(value)
         else:
             kwargs[field.name] = value
     # skip attributes if not enabled
-    if not use_attrs:
-        return cls(**kwargs)
-    # iterate attributes to match fields
-    for key, value in root.attrib.items():
-        field = fdict.get(key)
-        if field and field.anno in ALLOWED_ATTRS:
-            kwargs[field.name] = field.anno(value)
+    if use_attrs:
+        # iterate attributes to match fields
+        for key, value in root.attrib.items():
+            field = fdict.get(key)
+            if field and field.anno in ALLOWED_ATTRS:
+                kwargs[field.name] = field.anno(value)
+    # map kwargs to the original annotation type when possible
+    for key, value in kwargs.items():
+        field  = fdict[key]
+        origin = get_origin(field.anno)
+        if field.anno in SUPPORTED_TYPES and not isinstance(value, field.anno):
+            kwargs[key] = field.anno(value)
+        elif origin in SUPPORTED_TYPES and not isinstance(value, origin):
+            kwargs[key] = origin(value)
     return cls(**kwargs)
 
-def _fromxml_inner(anno: Type, elem: 'Element', *args) -> Any:
+def _fromxml_inner(pos: int, anno: Type, elem: 'Element', args: tuple) -> Any:
     """
     parse the specified xml-element to match the given annotation
 
+    :param pos:  current index of element from parent
     :param anno: annotation to parse from element
     :param elem: element being parsed to match annotation
     :param args: additional arguments to pass to parsers
@@ -168,23 +182,47 @@ def _fromxml_inner(anno: Type, elem: 'Element', *args) -> Any:
     # handle datacalss
     if is_dataclass(anno):
         return from_xml(anno, elem, *args)
-    # handle sequences
+    # handle named-tuple
+    if anno_is_namedtuple(anno):
+        # manually collect annotations from named-tuple
+        _, vannos = namedtuple_annos(anno)
+        if len(vannos) < len(elem):
+            raise ValueError(f'Too Few Elements for NamedTuple: {anno!r}')
+        if len(vannos) > len(elem):
+            raise ValueError(f'Too Many Elements for NamedTuple: {anno!r}')
+        result = {}
+        for pos, (vanno, child) in enumerate(zip(vannos, elem), 0):
+            key   = child.tag
+            value = _fromxml_inner(pos, vanno, child, args)
+            result[key] = value
+        return anno(**result)
+    # handle defined sequences
     origin = get_origin(anno)
-    if origin in (list, tuple, set, Sequence):
+    if origin in (list, set, Sequence):
         ianno = get_args(anno)[0]
-        return origin([_fromxml_inner(ianno, elem, *args)])
-    # handle dictionaries
+        return origin([_fromxml_inner(pos, ianno, elem, args)])
+    # handle defined tuples
+    if origin is tuple:
+        iannos = get_args(anno)
+        if len(iannos) <= pos:
+            raise ValueError(f'Too Many Elements for Tuple: {anno!r}')
+        ianno = iannos[pos]
+        return (_fromxml_inner(pos, ianno, elem, args), )
+    # handle defined dictionaries
     if origin in (dict, Mapping):
         _, vanno = get_args(anno)
         result   = {}
-        for child in elem:
+        for pos, child in enumerate(elem, 0):
             key   = child.tag
-            value = _fromxml_inner(vanno, child, *args)
+            value = _fromxml_inner(pos, vanno, child, args)
             result[key] = value
         return origin(result)
     # handle simple string conversion types
     if anno in ALLOWED_ATTRS:
-        return anno(elem.text)
+        try:
+            return anno(elem.text)
+        except Exception:
+            pass
     return elem.text
 
 def to_string(cls, **kwargs) -> str:
@@ -220,6 +258,10 @@ class Element(Protocol):
 
     @abstractmethod
     def __init__(self, tag: str):
+        raise NotImplementedError
+
+    @abstractmethod
+    def __len__(self) -> int:
         raise NotImplementedError
    
     @abstractmethod
