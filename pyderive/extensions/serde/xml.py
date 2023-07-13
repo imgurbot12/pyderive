@@ -161,8 +161,9 @@ def from_xml(cls: Type[T],
             if field and field.anno in ALLOWED_ATTRS:
                 kwargs[field.name] = field.anno(value)
     # map kwargs to the original annotation type when possible
+    namedict = {f.name:f for f in fields(cls)}
     for key, value in kwargs.items():
-        field  = fdict[key]
+        field  = namedict[key]
         origin = get_origin(field.anno)
         if field.anno in SUPPORTED_TYPES and not isinstance(value, field.anno):
             kwargs[key] = field.anno(value)
