@@ -2,7 +2,7 @@
 PyDerive Validation Extension UnitTests
 """
 from enum import Enum
-from typing import List, Set, Tuple, Union
+from typing import Dict, List, Set, Tuple, Union
 from unittest import TestCase
 
 from ...dataclasses import dataclass
@@ -184,7 +184,7 @@ class ValidationModelTests(TestCase):
         foo.validate()
         foo.a.extend(['d', 1])
         self.assertRaises(ValidationError, foo.validate)
-
+    
     def test_model_parsing(self):
         """ensure `BaseModel.parse_obj` function works as intended"""
         class Bar(BaseModel):
@@ -196,6 +196,25 @@ class ValidationModelTests(TestCase):
         foo2 = Foo.parse_obj(((1, 'ok', 2.1), [1.1]))
         self.assertEqual(foo1, foo2)
         self.assertRaises(ValidationError, Foo.parse_obj, {'a': (1.0, 'ok', 2.1), 'bar': {'x': 'ok'}})
+ 
+    def test_model_complex(self):
+        """ensure `BaseModel`.valdiate function works on complex objects"""
+        class Bar(BaseModel):
+            i: Tuple[str, int, float]
+        class Foo(BaseModel):
+            d: Dict[str, Bar]
+            l: List[Union[int, Bar]]
+            t: Tuple[bool, Bar, int]
+        foo1 = {'d': {'k1': {'i': ('a', 1, 1.1)}}, 'l': [7, 8], 't': (True, {'i': ('b', 2, 2.2)}, 3)}
+        foo2 = {'d': {'k1': {'i': ('a', 1, 1.1)}}, 'l': [7, 8], 't': (True, {'i': ('b', 2, 2.2)}, 3.1)}
+        foo3 = {'d': {'k1': {'i': ('a', 1, 1.1)}}, 'l': [7, 8.8], 't': (True, {'i': ('b', 2, 2.2)}, 3)}
+        foo4 = {'d': {'k1': {'i': ('a', 1, 1.1)}}, 'l': [7, 8], 't': (True, {'i': ('b', 2, 2)}, 3)}
+        foo5 = {'d': {'k1': {'i': ('a', 1, 1.1)}}, 'l': [7, 8], 't': (True, {'i': ('b', 2.2)}, 3)}
+        Foo.parse_obj(foo1)
+        self.assertRaises(ValidationError, Foo.parse_obj, foo2)
+        self.assertRaises(ValidationError, Foo.parse_obj, foo3)
+        self.assertRaises(ValidationError, Foo.parse_obj, foo4)
+        self.assertRaises(ValidationError, Foo.parse_obj, foo5)
 
     def test_model_subclass(self):
         """test `BaseModel` inherritance of another dataclass"""
