@@ -1,7 +1,7 @@
 """
 Rust Serde Inspired Serialization Decorators
 """
-from typing import Any, Dict, Optional, Tuple, Type, Union, overload
+from typing import Any, Callable, Dict, Optional, Tuple, Type, Union, overload
 from typing_extensions import Self, dataclass_transform
 from warnings import warn
 
@@ -16,6 +16,8 @@ __all__ = [
     'field', 
     'serialize', 
     'deserialize',
+    'register_serial',
+    'register_deserial',
 
     'from_object',
     'to_dict',
@@ -48,8 +50,16 @@ DESERIALIZER_IMPL: Dict[str, Deserializer] = {
 
 #** Functions **#
 
-@dataclass_transform()
+@overload
+def serde(cls: None = None, **kwargs) -> Callable[[T], T]:
+    ...
+
+@overload
 def serde(cls: T, **kwargs) -> T:
+    ...
+
+@dataclass_transform()
+def serde(cls: Optional[T] = None, **kwargs) -> Union[T, Callable[[T], T]]:
     """
     make dataclass and validate serde settings
 
@@ -57,13 +67,15 @@ def serde(cls: T, **kwargs) -> T:
     :param kwargs: additional settings to pass during dataclass generation
     :return:       dataclass/serde-supported object
     """
-    # transform into a dataclass if not already
-    if not is_dataclass(cls):
-        kwargs.setdefault('slots', True)
-        cls = dataclass(cls, **kwargs) #type: ignore
-    # validate serde-fields
-    validate_serde(cls)
-    return cls
+    def wrapper(cls: T) -> T:
+        # transform into a dataclass if not already
+        if not is_dataclass(cls):
+            kwargs.setdefault('slots', True)
+            cls = dataclass(cls, **kwargs) #type: ignore
+        # validate serde-fields
+        validate_serde(cls)
+        return cls
+    return wrapper if cls is None else wrapper(cls)
 
 def field(**kwargs) -> Any:
     """

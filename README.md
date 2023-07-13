@@ -11,6 +11,8 @@ pip install pyderive3
 
 ### Features
 
+Additional Features availalbe via [Extensions](./pyderive/extensions/README.md).
+
 ##### Expanded Reimplementation of Dataclasses
 
 ###### Default Standards Implemented
