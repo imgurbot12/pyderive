@@ -238,8 +238,12 @@ def _process_class(
         convert_params(cls)
     # parse and conregate fields
     struct = parse_fields(cls, factory=field, recurse=recurse)
-    fields = flatten_fields(struct)
+    fields = flatten_fields(struct, order_kw=not kw_only)
     freeze = frozen or any(f.frozen for f in fields)
+    # convert fields to kw-only if enabled
+    if kw_only:
+        for f in fields:
+            f.kw_only = True
     # validate settings and save fields/params
     params = DataParams(init, repr, eq, order, unsafe_hash, 
         frozen, match_args, kw_only, slots, recurse, field)
