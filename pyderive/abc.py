@@ -101,7 +101,7 @@ class FieldDef(Protocol):
     def __init__(self, name: str, anno: Type, default: Any = MISSING):
         raise NotImplementedError
 
-    def finalize(self):
+    def __compile__(self, cls: Type):
         """run finalize when field variables are finished compiling"""
         pass
 

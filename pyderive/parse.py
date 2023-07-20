@@ -103,7 +103,7 @@ def parse_fields(
                 field.anno = anno.type
                 field.field_type = FieldType.INIT_VAR 
             # finalize field build and assign to struct
-            field.finalize()
+            field.__compile__(cls)
             fields.fields[name] = field
         # apply fields to baseclass to allow for inheritance
         fields.base        = base
