@@ -1,15 +1,14 @@
 """
-PyDerive UnitTests
+PyDerive Extensions Tests
 """
 
 #** Variables **#
 __all__ = [
-    'DataClassTests', 
     'SerdeTests',
     'ValidationTests', 
     'ValidationModelTests'
 ]
 
 #** Imports **#
-from .dataclasses import *
-from .extensions import *
+from .serde import *
+from .validate import *

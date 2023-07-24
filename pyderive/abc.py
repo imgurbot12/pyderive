@@ -8,7 +8,15 @@ from typing_extensions import Self, runtime_checkable
 
 #** Variables **#
 __all__ = [
+    'has_default',
+
     'T',
+    'F',
+    'TypeT',
+    'DataFunc',
+
+    'has_default',
+
     'MISSING',
     'InitVar',
     'FrozenInstanceError',
@@ -24,11 +32,35 @@ __all__ = [
 #: generic typevar
 T = TypeVar('T')
 
+#: generic typevar for field
+F = TypeVar('F', bound='FieldDef')
+
+#: generic typevar bound to type
+TypeT = TypeVar('TypeT', bound=Type)
+
+#: typehint for dataclass creator function
+DataFunc = Callable[[TypeT], TypeT] 
+
 #: type definition for a list of fields
 Fields = List['FieldDef']
 
+#: optional dictionary typehint
+OptDict = Optional[Dict[str, Any]]
+
 #: callable factory type hint
 DefaultFactory = Union['MISSING', None, Callable[[], Any]]
+
+#: field validator function
+FieldValidator = Callable[[Any, F, Any], Any]
+
+#: optional field validator function
+OptValidator = Optional[FieldValidator]
+
+#** Functions **#
+
+def has_default(field: 'FieldDef') -> bool:
+    """return true if field has default"""
+    return field.default is not MISSING or field.default_factory is not MISSING
 
 #** Classes **#
 
@@ -61,13 +93,15 @@ class FieldDef(Protocol):
     compare:         bool           = True
     kw_only:         bool           = False
     frozen:          bool           = False
+    validator:       OptValidator   = None
+    metadata:        Dict[str, Any] = {}
     field_type:      FieldType      = FieldType.STANDARD
  
     @abstractmethod
     def __init__(self, name: str, anno: Type, default: Any = MISSING):
         raise NotImplementedError
 
-    def finalize(self):
+    def __compile__(self, cls: Type):
         """run finalize when field variables are finished compiling"""
         pass
 
@@ -84,6 +118,8 @@ class Field(FieldDef):
         compare:         bool           = True,
         kw_only:         bool           = False,
         frozen:          bool           = False,
+        validator:       OptValidator   = None,
+        metadata:        OptDict        = None,
         field_type:      FieldType      = FieldType.STANDARD
     ):
         self.name            = name
@@ -96,6 +132,8 @@ class Field(FieldDef):
         self.compare         = compare
         self.kw_only         = kw_only
         self.frozen          = frozen
+        self.validator       = validator
+        self.metadata        = metadata or {}
         self.field_type      = field_type
 
 class FlatStruct:
@@ -112,7 +150,37 @@ class FlatStruct:
         return [self.fields[name] for name in self.order]
 
 class ClassStruct(FlatStruct):
- 
+    base:        Optional[Type]
+    annotations: Optional[Dict[str, Any]]
+
     def __init__(self, *args, parent: Optional[Self] = None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.parent = parent
+        self.parent      = parent
+        self.base        = None
+        self.annotations = None
+
+    def is_base_compiled(self, base: Type) -> bool:
+        """
+        check if baseclass is already compiled
+
+        :param base: baseclass to confirm already compiled
+        :return:     true if baseclass found in class-struct tree
+        """
+        if self.base is not None and self.base == base:
+            return True
+        if self.parent is not None:
+            return self.parent.is_base_compiled(base)
+        return False
+
+    def is_anno_compiled(self, anno: Dict[str, Any]) -> bool:
+        """
+        check if annotations are already compiled
+
+        :param anno: annotation to confirm already compiled
+        :return:     true if annotations are already compiled
+        """
+        if self.annotations is not None and self.annotations == anno:
+            return True
+        if self.parent is not None:
+            return self.parent.is_anno_compiled(anno)
+        return False

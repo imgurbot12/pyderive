@@ -23,6 +23,8 @@ __all__ = [
     'freeze_fields',
 ]
 
+#:TODO: add unit-test for validator added with default/default-factory/frozen
+
 #: post init function
 POST_INIT = '__post_init__'
 
@@ -95,6 +97,21 @@ def _init_assign(self_name: str, name: str, value: str, frozen: bool) -> str:
         return f'object.__setattr__({self_name}, {name!r}, {value})'
     return f'{self_name}.{name}={value}'
 
+def _init_validator(self_name: str, 
+    field: FieldDef, value: str, globals: dict) -> Tuple[List[str], str]:
+    """generate field validator function call"""
+    field_name = f'_field_{field.name}'
+    validator  = f'_validate_{field.name}'
+    globals[field_name] = field
+    globals[validator]  = field.validator
+    # generate validators/value code
+    validators = []
+    if field.default_factory is not MISSING:
+        validators.append(f'{field.name}={value}')
+        value = field.name
+    validators += [f'{value}={validator}({self_name}, {field_name}, {value})']
+    return validators, value
+
 def create_init(
     fields:    Fields,
     kw_only:   bool = False, 
@@ -112,12 +129,11 @@ def create_init(
     self_name = 'self'
     locals:  Dict[str, Any] = {}
     globals: Dict[str, Any] = {HDF_VAR: HDF}
-    args, post, body, kwonly = ['self'], [], [], []
+    args, post, body, validators, kwonly = ['self'], [], [], [], []
     for field in fields:
         # handle non-init edge cases
         name = field.name
-        if not field.init and field.default is MISSING \
-            and field.default_factory is MISSING:
+        if not field.init and not has_default(field): 
             # raise an error if field is an init-var
             if field.field_type == FieldType.INIT_VAR:
                 raise TypeError(f'field {name!r} must have init as InitVar')
@@ -130,6 +146,13 @@ def create_init(
                 kwonly.append(param)
             else:
                 args.append(param)
+        # build validator function when enabled
+        if field.validator is not None:
+            if not callable(field.validator):
+                raise TypeError(f'field {name!r} validator is not callable')
+            validator, value = _init_validator(self_name, field, value, globals)
+            validators.extend(validator)
+        # track init-vars for later generation
         if field.field_type == FieldType.INIT_VAR:
             if field.default_factory is not MISSING:
                 raise TypeError(
@@ -140,6 +163,8 @@ def create_init(
         assign = _init_assign(self_name, name, value, frozen or field.frozen)
         body.append(assign)
     # ensure body exists
+    if validators:
+        body = [*validators, *body]
     if post_init:
         params = ', '.join(post)
         body.append(f'self.{POST_INIT}({params})')

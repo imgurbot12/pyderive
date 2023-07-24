@@ -17,28 +17,35 @@ __all__ = [
     'MISSING', 
     'DataClassLike',
     'FrozenInstanceError',
- 
+    
+    'TupleFactory',
+    'DictFactory',
+
     'is_dataclass',
     'field', 
     'fields',
+    'astuple',
     'asdict',
     'dataclass'
 ]
+
+#: asdict/astuple custom encoder function
+EncoderFunc = Callable[[Any], Any] 
+
+#: optional asdict/astuple encoder function
+OptEncoderFunc = Optional[EncoderFunc]
+
+#: tuple factory
+TupleFactory = Union[Type[tuple], Callable[[Any, Any], Tuple]]
+
+#: dictionary factory
+DictFactory = Union[Type[dict], Callable[[Any, Any], Dict]]
 
 #: dataclass fields attribute
 FIELD_ATTR = '__datafields__'
 
 #: dataclas params attribute
 PARAMS_ATTR = '__dataparams__'
-
-#: field generic type
-F = TypeVar('F', bound=FieldDef)
-
-#: type for type-alias
-TypeT = Type[T]
-
-#: typehint for dataclass creator function
-DataFunc = Callable[[TypeT], TypeT] 
 
 _hash_add  = lambda _, fields: create_hash(fields)
 _hash_none = lambda *_: None
@@ -107,7 +114,58 @@ def fields(cls, all_types: bool = False):
         fields = [f for f in fields if f.field_type == FieldType.STANDARD]
     return fields
 
-def _asdict_inner(obj, rec: int, factory: Type[dict], lvl: int):
+def _astuple_inner(obj, rec: int, 
+    encoder: OptEncoderFunc, factory: TupleFactory, lvl: int) -> Any:
+    """inner tuple-ify function to convert dataclass fields to tuple"""
+    # stop recursin after limit
+    if rec > 0 and lvl >= rec:
+        return obj
+    # dataclass
+    lvl += 1
+    if is_dataclass(obj):
+        result = []
+        for f in fields(obj):
+            attr  = getattr(obj, f.name)
+            value = _astuple_inner(attr, rec, encoder, factory, lvl)
+            result.append(value)
+        if isinstance(factory, type):
+            return factory(result)
+        return factory(obj, result)
+    # named-tuple
+    elif isinstance(obj, tuple) and hasattr(obj, '_fields'):
+        return type(obj)(*[
+            _astuple_inner(v, rec, encoder, factory, lvl) for v in obj])
+    # standard list/tuple
+    elif isinstance(obj, (list, tuple)):
+        return type(obj)(
+            _astuple_inner(v, rec, encoder, factory, lvl) for v in obj)
+    elif isinstance(obj, dict):
+        return type(obj)((_astuple_inner(k, rec, encoder, factory, lvl),
+                          _astuple_inner(v, rec, encoder, factory, lvl))
+                         for k, v in obj.items())
+    else:
+        value = copy.deepcopy(obj)
+        return value if encoder is None else encoder(value)
+
+def astuple(cls, *, 
+    recurse:       int            = 0, 
+    encoder:       OptEncoderFunc = None, 
+    tuple_factory: TupleFactory   = tuple
+) -> tuple:
+    """
+    convert dataclass object into dictionary of field-values
+
+    :param cls:           dataclass object class instance
+    :param encoder:       python object encoder function
+    :param tuple_factory: factory used to generate tuple
+    :return:              field instances as dict
+    """
+    if not is_dataclass(cls):
+        raise TypeError('astuple() should be called on dataclass instances')
+    return _astuple_inner(cls, recurse, encoder, tuple_factory, 0)
+
+def _asdict_inner(obj, rec: int, 
+    encoder: OptEncoderFunc, factory: DictFactory, lvl: int) -> Any:
     """inner dictionary-ify function to convert dataclass fields into dict"""
     # stop recursin after limit
     if rec > 0 and lvl >= rec:
@@ -118,32 +176,43 @@ def _asdict_inner(obj, rec: int, factory: Type[dict], lvl: int):
         result = []
         for f in fields(obj):
             attr  = getattr(obj, f.name)
-            value = _asdict_inner(attr, rec, factory, lvl)
+            value = _asdict_inner(attr, rec, encoder, factory, lvl)
             result.append((f.name, value))
-        return factory(result)
+        if isinstance(factory, type):
+            return factory(result)
+        return factory(obj, result)
     # named-tuple
     elif isinstance(obj, tuple) and hasattr(obj, '_fields'):
-        return type(obj)(*[_asdict_inner(v, rec, factory, lvl) for v in obj])
+        return type(obj)(*[
+            _asdict_inner(v, rec, encoder, factory, lvl) for v in obj])
     # standard list/tuple
     elif isinstance(obj, (list, tuple)):
-        return type(obj)(_asdict_inner(v, rec, factory, lvl) for v in obj)
+        return type(obj)(
+            _asdict_inner(v, rec, encoder, factory, lvl) for v in obj)
     elif isinstance(obj, dict):
-        return type(obj)((_asdict_inner(k, rec, factory, lvl),
-                          _asdict_inner(v, rec, factory, lvl))
+        return type(obj)((_asdict_inner(k, rec, encoder, factory, lvl),
+                          _asdict_inner(v, rec, encoder, factory, lvl))
                          for k, v in obj.items())
     else:
-        return copy.deepcopy(obj) 
+        value = copy.deepcopy(obj)
+        return value if encoder is None else encoder(value)
 
-def asdict(cls, *, recurse: int = 0, dict_factory: Type[dict] = dict) -> dict:
+def asdict(cls, *, 
+    recurse:      int            = 0, 
+    encoder:      OptEncoderFunc = None, 
+    dict_factory: DictFactory    = dict
+) -> dict:
     """
     convert dataclass object into dictionary of field-values
 
-    :param cls: dataclass object class instance
-    :return:    field instances as dict
+    :param cls:          dataclass object class instance
+    :param encoder:      python object encoder function
+    :param dict_factory: factory used to generate tuple
+    :return:             field instances as dict
     """
     if not is_dataclass(cls):
         raise TypeError('asdict() should be called on dataclass instances')
-    return _asdict_inner(cls, recurse, dict_factory, 0) #type: ignore
+    return _asdict_inner(cls, recurse, encoder, dict_factory, 0)
 
 @dataclass_transform(field_specifiers=(FieldDef, Field, field))
 def _process_class(
@@ -169,8 +238,12 @@ def _process_class(
         convert_params(cls)
     # parse and conregate fields
     struct = parse_fields(cls, factory=field, recurse=recurse)
-    fields = flatten_fields(struct)
+    fields = flatten_fields(struct, order_kw=not kw_only)
     freeze = frozen or any(f.frozen for f in fields)
+    # convert fields to kw-only if enabled
+    if kw_only:
+        for f in fields:
+            f.kw_only = True
     # validate settings and save fields/params
     params = DataParams(init, repr, eq, order, unsafe_hash, 
         frozen, match_args, kw_only, slots, recurse, field)
@@ -232,7 +305,7 @@ def _process_class(
         cls = add_slots(cls, fields, freeze)
     # update abstraction-methods on re-creation and return
     if hasattr(abc, 'update_abstractmethods'):
-        abc.update_abstractmethods(cls)
+        abc.update_abstractmethods(cls) #type: ignore
     return cls
 
 @overload

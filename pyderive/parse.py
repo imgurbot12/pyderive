@@ -19,11 +19,6 @@ __all__ = [
 #: raw field attribute name
 DERIVE_ATTR = '__derive__'
 
-#: track hashes of already compiled baseclasses
-COMPILED = set()
-
-COMPILED_ANNOTATIONS = set()
-
 #** Functions **#
 
 def remove_field(fields: ClassStruct, name: str):
@@ -54,7 +49,6 @@ def parse_fields(
     :param strict:  be strict on factory field type during parsing
     :return:        unprocessed dataclass field definitions
     """
-    global COMPILED, COMPILED_ANNOTATIONS
     bases  = list(cls.__mro__) if recurse else [cls]
     fields = None
     ftype: Type[FieldDef] = factory if strict else FieldDef
@@ -63,10 +57,6 @@ def parse_fields(
         base = bases.pop()
         if base is object:
             continue
-        # skip if recursive and already compiled
-        if recurse and hash(base) in COMPILED:
-            continue
-        COMPILED.add(hash(base))
         # convert stdlib dataclass fields to valid class-struct
         parent = getattr(base, DERIVE_ATTR, None)
         if parent is None and is_stddataclass(base):
@@ -74,11 +64,13 @@ def parse_fields(
             names  = [f.name for f in fields]
             parent = ClassStruct(names, {f.name:f for f in fields})
         fields = ClassStruct(parent=parent)
-        # skip evaluations is annotations have already been checked
-        annotations = getattr(base, '__annotations__', {})
-        if id(annotations) in COMPILED_ANNOTATIONS:
+        # check if baseclass is already compiled
+        if fields.is_base_compiled(base):
             continue
-        COMPILED_ANNOTATIONS.add(id(annotations))
+        # skip evaluations is annotations have already been checked
+        annotations = getattr(base, '__annotations__', None) or dict()
+        if fields.is_anno_compiled(annotations):
+            continue
         # iterate annotations
         for name, anno in annotations.items():
             # handle ClassVar
@@ -111,9 +103,11 @@ def parse_fields(
                 field.anno = anno.type
                 field.field_type = FieldType.INIT_VAR 
             # finalize field build and assign to struct
-            field.finalize()
+            field.__compile__(cls)
             fields.fields[name] = field
         # apply fields to baseclass to allow for inheritance
+        fields.base        = base
+        fields.annotations = annotations
         if fields.fields:
             setattr(base, DERIVE_ATTR, fields)
     # ensure fields were parsed
@@ -123,10 +117,6 @@ def parse_fields(
     if not hasattr(cls, DERIVE_ATTR):
         setattr(cls, DERIVE_ATTR, fields)
     return fields
-
-def has_default(field: FieldDef) -> bool:
-    """return true if field has default"""
-    return field.default is not MISSING or field.default_factory is not MISSING
 
 def flatten_fields(
     fields: ClassStruct, order_kw: bool = True) -> Fields:
