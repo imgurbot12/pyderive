@@ -21,6 +21,7 @@ __all__ = [
     'IPvAnyNetwork',
     'IPvAnyInterface',
     'Bytes',
+    'HexBytes',
     'URL',
     'Domain',
     'Host',
