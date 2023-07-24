@@ -20,6 +20,7 @@ __all__ = [
     'IPvAnyAddress',
     'IPvAnyNetwork',
     'IPvAnyInterface',
+    'Bytes',
     'URL',
     'Domain',
     'Host',

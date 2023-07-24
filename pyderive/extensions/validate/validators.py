@@ -7,6 +7,8 @@ from typing_extensions import Annotated, get_origin, get_args
 
 from ..serde import is_sequence
 from ...abc import FieldDef, FieldValidator
+from ...compat import is_stddataclass
+from ...dataclasses import is_dataclass
 
 #** Variables **#
 __all__ = [
@@ -64,6 +66,7 @@ def simple_validator(cast: Type, typecast: bool) -> TypeValidator:
         if isinstance(value, cast):
             return value
         if typecast:
+            # attempt normal casting
             try:
                 return cast(value)
             except (ValueError, ValidationError):
@@ -221,6 +224,35 @@ def union_validator(anno: Type,
         raise ValidationError(f'Invalid Value: {value!r}')
     return validator
 
+def dclass_validator(anno: Type, typecast: bool) -> TypeValidator:
+    """
+    generate a dataclass type validator
+
+    :param anno:     dataclass annotation
+    :param typecast: attempt typecast into dataclass if enabled
+    """
+    @_wrap(_anno_name(anno))
+    def validator(value: Any):
+        if isinstance(value, anno):
+            return value
+        if typecast:
+            if isinstance(value, Mapping):
+                try:
+                    return anno(**value)
+                except (ValueError, ValidationError):
+                    pass
+            if isinstance(value, (set, Sequence)):
+                try:
+                    return anno(*value)
+                except (ValueError, ValidationError):
+                    pass
+            try:
+                return anno(value)
+            except (ValueError, ValidationError):
+                pass
+        raise ValidationError(f'Invalid Value: {value!r}')
+    return validator
+
 def chain_validators(validators: List[TypeValidator]) -> TypeValidator:
     """
     chain a series of type-validators together
@@ -250,6 +282,9 @@ def type_validator(anno: Type, typecast: bool) -> TypeValidator:
     # check for `Enum` annotation
     if isinstance(anno, type) and issubclass(anno, Enum):
         return enum_validator(anno, typecast)
+    # check if dataclass instance
+    if is_dataclass(anno) or is_stddataclass(anno):
+        return dclass_validator(anno, typecast)
     # check for `Annotated` validator definitions
     origin, args = get_origin(anno), get_args(anno)
     if origin is Annotated:

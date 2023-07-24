@@ -20,6 +20,7 @@ __all__ = [
     'IPvAnyNetwork',
     'IPvAnyInterface',
 
+    'Bytes',
     'URL',
     'Domain',
     'Host',
@@ -44,6 +45,12 @@ IPvAnyNetwork = Annotated[Union[IPv4Network, IPv6Network, str, bytes], PreValida
 IPvAnyInterface = Annotated[Union[IPv4Interface, IPv6Interface, str, bytes], PreValidator[ip_interface]]
 
 #** Function **#
+
+def is_bytes(value: Union[str, bytes]):
+    """check that value is a valid bytes/bytearray string"""
+    if isinstance(value, str):
+        return bytes.fromhex(value)
+    return value
 
 def is_url(value: str) -> str:
     """check that value is valid url (very naive approach)"""
@@ -122,6 +129,9 @@ def is_timedelta(value: 'Timedelta') -> timedelta:
     return timedelta(**kwargs)
 
 #** Init **#
+
+#: convert hexidecimal strings into bytes
+Bytes = Annotated[Union[str, bytes], Validator[is_bytes]]
 
 #: validate string is a url
 URL = Annotated[str, Validator[is_url]]
