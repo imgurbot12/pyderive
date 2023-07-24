@@ -187,8 +187,14 @@ def _parse_object(name: str,
     if anno_is_namedtuple(anno):
         names, args = namedtuple_annos(anno)
         return _parse_tuple(name, anno, names, args, value, decoder, kwargs)
-    # handle defined dictionary types
+    # handle defined union tpes
     origin = get_origin(anno)
+    if origin is Union:
+        for subanno in get_args(anno):
+            newval = _parse_object(name, subanno, value, decoder, kwargs)
+            if newval != value:
+                return newval
+    # handle defined dictionary types
     if origin in (dict, Mapping):
         # raise error if value does not match annotation
         if not isinstance(value, (dict, Mapping)):
