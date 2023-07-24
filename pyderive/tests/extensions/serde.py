@@ -1,7 +1,7 @@
 """
 PyDerive Validation Extension UnitTests
 """
-from typing import Any, Dict, List, NamedTuple, Tuple, Type
+from typing import Any, Dict, List, NamedTuple, Tuple, Type, Union
 from unittest import TestCase
 
 from ...extensions.serde import *
@@ -61,16 +61,18 @@ class SerdeTests(TestCase):
         class Bar(Serde):
             plot:  Dict[str, int]
             scale: List[float]
+        class Bax(NamedTuple):
+            a: int
         class Baz(NamedTuple):
             x: int
-            y: int
+            y: Union[int, float, Bax]
         class Foo(Serde):
             data: Tuple[bool, float, Baz]
             bars: Dict[str, Bar]
             tups: List[Baz]
         bar1 = Bar({'a': 1, 'b': 2}, [1.1, 2.2])
         bar2 = Bar({'c': 3, 'd': 4}, [3.3, 4.4])
-        foo  = Foo((True, 6.9, Baz(1, 2)), {'bar1': bar1, 'bar2': bar2}, [Baz(3, 4), Baz(5, 6)])
+        foo  = Foo((True, 6.9, Baz(1, 2)), {'bar1': bar1, 'bar2': bar2}, [Baz(3, 4.1), Baz(5, Bax(9))])
         dfoo = foo.asdict()
         tfoo = foo.astuple()
         fooj = foo.to_json()

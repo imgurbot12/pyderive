@@ -190,12 +190,18 @@ def _parse_object(name: str,
     # handle defined union tpes
     origin = get_origin(anno)
     if origin is Union:
-        for subanno in get_args(anno):
+        # check if already a valid type in union
+        args = get_args(anno)
+        types = tuple(arg for arg in args if isinstance(arg, type))
+        if isinstance(value, types):
+            return value
+        # attempt to convert it w/ parsing
+        for subanno in args:
             newval = _parse_object(name, subanno, value, decoder, kwargs)
             if newval != value:
                 return newval
     # handle defined dictionary types
-    if origin in (dict, Mapping):
+    elif origin in (dict, Mapping):
         # raise error if value does not match annotation
         if not isinstance(value, (dict, Mapping)):
             raise _unexpected(name, anno, value)
@@ -209,13 +215,13 @@ def _parse_object(name: str,
             result[k] = v
         return type(value)(result) # type: ignore
     # handle defined tuple sequences
-    if origin is tuple:
+    elif origin is tuple:
         # raise error if value does not match annotation
         args  = get_args(anno)
         names = [f'{name}[{n}]' for n in range(0, len(args))]
         return _parse_tuple(name, anno, names, args, value, decoder, kwargs)
     # handle defined sequence types
-    if origin in (list, set, Sequence):
+    elif origin in (list, set, Sequence):
         oanno = list if not origin or origin is Sequence else origin
         # raise error if value does not match annotation
         if not is_sequence(value):
@@ -228,10 +234,10 @@ def _parse_object(name: str,
             result.append(item)
         return oanno(result)
     # allow for custom decoding on arbritrary types
-    if value not in SUPPORTED_TYPES:
+    elif value not in SUPPORTED_TYPES:
         return decoder.default(anno, value)
     # allow for typecasting when value type does not match
-    if anno in SUPPORTED_TYPES and type(value) != anno:
+    elif anno in SUPPORTED_TYPES and type(value) != anno:
         return anno(value)
     return value
 

@@ -109,13 +109,16 @@ def _asxml_inner(
     elif isinstance(obj, (list, tuple)):
         for value in obj:
             _asxml_inner(root, name, value, rec, lvl, attrs, use_type)
+    # dictionary/mapping
     elif isinstance(obj, dict):
         elem = ElementFactory(name)
         for key, value in obj.items():
             _asxml_inner(elem, str(key), value, rec, lvl, attrs, use_type)
         root.append(elem)
+    # allowed attributes
     elif attrs and type(obj) in ALLOWED_ATTRS:
         root.attrib[name] = str(obj)
+    # default
     else:
         elem = ElementFactory(name)
         elem.text   = str(obj)
@@ -193,18 +196,24 @@ def _fromxml_inner(pos: int, anno: Type, elem: 'Element', args: tuple) -> Any:
             value = _fromxml_inner(pos, vanno, child, args)
             result[key] = value
         return anno(**result)
-    # handle defined sequences
+    # handle defined unions
     origin = get_origin(anno)
-    if origin in (list, set, Sequence):
+    if origin is Union:
+        for subanno in get_args(anno):
+            newval = _fromxml_inner(pos, subanno, elem, args)
+            if newval != elem.text:
+                return newval
+    # handle defined sequences
+    elif origin in (list, set, Sequence):
         ianno = get_args(anno)[0]
         return origin([_fromxml_inner(pos, ianno, elem, args)])
     # handle defined tuples
-    if origin is tuple:
+    elif origin is tuple:
         iannos = get_args(anno)
         ianno = iannos[pos] if pos < len(iannos) else str
         return (_fromxml_inner(pos, ianno, elem, args), )
     # handle defined dictionaries
-    if origin in (dict, Mapping):
+    elif origin in (dict, Mapping):
         _, vanno = get_args(anno)
         result   = {}
         for pos, child in enumerate(elem, 0):
@@ -213,7 +222,7 @@ def _fromxml_inner(pos: int, anno: Type, elem: 'Element', args: tuple) -> Any:
             result[key] = value
         return origin(result)
     # handle simple string conversion types
-    if anno in ALLOWED_ATTRS:
+    elif anno in ALLOWED_ATTRS:
         try:
             return anno(elem.text)
         except Exception:
