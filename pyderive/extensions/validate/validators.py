@@ -26,8 +26,11 @@ __all__ = [
     'PostValidator',
 ]
 
+#: generic typevar
+T = TypeVar('T')
+
 #: type validator / type translation function
-TypeValidator = Callable[[Any], Any]
+TypeValidator = Callable[[T], T]
 
 #: global type-validator registry
 TYPE_VALIDATORS: Dict[Type, List[TypeValidator]] = {}
@@ -52,7 +55,7 @@ def none_validator(value: Any):
     if value is not None:
         raise ValueError(f'{value!r} is not None')
 
-def simple_validator(cast: Type, typecast: bool) -> TypeValidator:
+def simple_validator(cast: Type[T], typecast: bool) -> TypeValidator[T]:
     """
     generate generic validation function for the specified type
 
@@ -79,6 +82,7 @@ def seq_validator(outer: Type, base: Type, iv: TypeValidator, typecast: bool) ->
     generate generic sequence-type typecast validator for the specified type
 
     :param outer:    outer sequence type definition
+    :param base:     base annotation for inner value
     :param iv:       validation for inner sequence type
     :param typecast: allow typecasting when enabled
     :return:         custom sequence validation function
