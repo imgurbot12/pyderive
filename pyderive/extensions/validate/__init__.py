@@ -21,6 +21,7 @@ __all__ = [
     'IPvAnyAddress',
     'IPvAnyNetwork',
     'IPvAnyInterface',
+    'Email',
     'Bytes',
     'HexBytes',
     'URL',
@@ -36,6 +37,7 @@ __all__ = [
     'Max', 
     'Range', 
     'Length',
+    'Regex',
     'BoolFunc',
     'IsAlNum',
 
@@ -95,7 +97,7 @@ def validate(cls = None, typecast: bool = False, **kwargs):
         fields = getattr(cls, FIELD_ATTR)
         params = getattr(cls, PARAMS_ATTR)
         for f in fields:
-            f.validator = f.validator or field_validator(f, typecast)
+            f.validator = f.validator or field_validator(cls, f, typecast)
             # recursively configure dataclass annotations
             if is_dataclass(f.anno) and not hasattr(f.anno, VALIDATE_ATTR):
                 f.anno = validate(f.anno, typecast)

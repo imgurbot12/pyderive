@@ -10,6 +10,7 @@ from typing import Union
 from typing_extensions import Annotated
 from urllib.parse import urlsplit
 
+from .helpers import Regex
 from .validators import *
 
 #** Variables **#
@@ -19,6 +20,7 @@ __all__ = [
     'IPvAnyAddress',
     'IPvAnyNetwork',
     'IPvAnyInterface',
+    'Email',
 
     'Bytes',
     'HexBytes',
@@ -38,12 +40,16 @@ _re_domain = re.compile(r'^(?:[a-zA-Z0-9_](?:[a-zA-Z0-9-_]{0,61}' + \
 _re_timedelta = re.compile(r'^(\d+[a-z]+)+$')
 _re_timedelta_group = re.compile(r'\d+[a-z]+')
 
+_re_email = r"""(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|\"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*\")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])"""
+
 IPv4 = Annotated[Union[IPv4Address, str, bytes], PreValidator[IPv4Address]]
 IPv6 = Annotated[Union[IPv6Address, str, bytes], PreValidator[IPv6Address]]
 
 IPvAnyAddress = Annotated[Union[IPv4Address, IPv6Address, str, bytes], PreValidator[ip_address]]
 IPvAnyNetwork = Annotated[Union[IPv4Network, IPv6Network, str, bytes], PreValidator[ip_network]]
 IPvAnyInterface = Annotated[Union[IPv4Interface, IPv6Interface, str, bytes], PreValidator[ip_interface]]
+
+Email = Annotated[str, Regex(_re_email)]
 
 #** Function **#
 

@@ -1,6 +1,9 @@
 """
 Type/Field Validator Implementations
 """
+import functools
+import sys
+import typing
 from enum import Enum
 from typing import *
 from typing_extensions import Annotated, get_origin, get_args
@@ -270,13 +273,49 @@ def chain_validators(validators: List[TypeValidator]) -> TypeValidator:
         return value
     return chain
 
-def type_validator(anno: Type, typecast: bool) -> TypeValidator:
+def ref_validator(cls: Type, ref: ForwardRef, typecast: bool) -> TypeValidator:
+    """
+    generate forward-reference validator to process forward-reference
+
+    :param cls:      dataclass associated w/ reference
+    :param ref:      forward-reference to later resolve
+    :param typecast: allow for typecasting when enabled
+    :return:         forward-reference validator function
+    """
+    # generate dereference function w/ cache to avoid repeat lookups
+    @functools.lru_cache(maxsize=None)
+    def deref() -> Type:
+        # deref annotation
+        module   = getattr(cls, '__module__')
+        nglobals = getattr(sys.modules.get(module, None), '__dict__', {})
+        nlocals  = dict(vars(cls))
+        anno     = typing._eval_type(ref, nglobals, nlocals)
+        print('anno', anno)
+        # generate validator
+        return type_validator(anno, typecast)
+    # generate validator 
+    @_wrap(ref.__forward_arg__)
+    def validator(value: Any):
+        return deref()(value)
+    return validator 
+
+def type_validator(anno: Type, 
+    typecast: bool, cls: Optional[Type] = None) -> TypeValidator:
     """
     generate a type-validator for the given annotation
 
-    :param anno: annotation to validate for
-    :return:     field validator for the given annotation
+    :param anno:     annotation to validate for
+    :param typecast: allow for typecasting when enabled
+    :param cls:      dataclass associated w/ annotation assignment
+    :return:         field validator for the given annotation
     """
+    # check if string/forward-reference
+    if isinstance(anno, (str, ForwardRef)):
+        if cls is None:
+            raise TypeError(f'Cannot Resolve ForwardReferences: {anno!r}')
+        if isinstance(anno, str):
+            anno = ForwardRef(anno)
+        return ref_validator(cls, anno, typecast)
     # check for standard validator types
     if anno is None or anno is type(None):
         return none_validator
@@ -292,7 +331,7 @@ def type_validator(anno: Type, typecast: bool) -> TypeValidator:
     # check for `Annotated` validator definitions
     origin, args = get_origin(anno), get_args(anno)
     if origin is Annotated:
-        middle    = [type_validator(args[0], typecast)]
+        middle    = [type_validator(args[0], typecast, cls)]
         pre, post = [], []
         for value in args[1:]:
             if isinstance(value, PreValidator):
@@ -304,7 +343,7 @@ def type_validator(anno: Type, typecast: bool) -> TypeValidator:
         return chain_validators([*pre, *middle, *post])
     # check for `Union` annotation
     if origin is Union:
-        validators = [type_validator(arg, typecast) for arg in args]
+        validators = [type_validator(arg, typecast, cls) for arg in args]
         return union_validator(anno, args, validators)
     # check for `tuple` annotation
     if origin is tuple:
@@ -315,26 +354,28 @@ def type_validator(anno: Type, typecast: bool) -> TypeValidator:
     # check for `Sequence` annotation
     if origin in (list, set, Sequence):
         base      = list if origin is Sequence else origin
-        validator = type_validator(args[0], typecast)
+        validator = type_validator(args[0], typecast, cls)
         return seq_validator(anno, base, validator, typecast)
     # check for `Mapping` annnotation
     if origin in (dict, Mapping):
         base          = dict if origin is Mapping else origin
-        key_validator = type_validator(args[0], typecast)
-        val_validator = type_validator(args[1], typecast)
+        key_validator = type_validator(args[0], typecast, cls)
+        val_validator = type_validator(args[1], typecast, cls)
         return map_validator(anno, base, key_validator, val_validator)
     # attempt a simple/typecast annotation on anything else
     return simple_validator(anno, typecast)
 
-def field_validator(field: FieldDef, typecast: bool = False) -> FieldValidator:
+def field_validator(cls: Type, 
+    field: FieldDef, typecast: bool = False) -> FieldValidator:
     """
     generate field-validator for the specified field definition
 
+    :param cls:      dataclass object associated w/ field
     :param field:    field to add validator for
     :param typecast: allow for typecasting when enabled
     :return:         validation function for field
     """
-    validator = type_validator(field.anno, typecast)
+    validator = type_validator(field.anno, typecast, cls=cls)
     def field_validator(self, field: FieldDef, value: Any):
         try:
             return validator(value)

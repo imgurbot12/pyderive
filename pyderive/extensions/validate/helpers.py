@@ -1,12 +1,13 @@
 """
 Custom Validator Helpers for Common Types
 """
+import re
 from typing import Callable, Optional, Sized, TypeVar, Union
 
 from .validators import T, Validator, TypeValidator, ValidationError, chain_validators
 
 #** Variables **#
-__all__ = ['Min', 'Max', 'Range', 'Length', 'BoolFunc', 'IsAlNum']
+__all__ = ['Min', 'Max', 'Range', 'Length', 'Regex', 'BoolFunc', 'IsAlNum']
 
 I = TypeVar('I', bound=Union[int, float])
 
@@ -60,6 +61,22 @@ def Length(l: int) -> TypeValidator:
             raise ValidationError(f'{s!r} too long: {len(s)} > {l}')
         return s
     return Validator[length]
+
+def Regex(r: str, **kwargs) -> TypeValidator:
+    """
+    Generate Regex Validator for String Object
+
+    :param r:      regex expression
+    :param kwargs: regex compilation flags
+    """
+    pattern = re.compile(r, **kwargs)
+    def match_regex(s: str):
+        if not isinstance(s, str):
+            raise ValidationError(f'Cannot Match Against: {s!r}')
+        if not pattern.match(s):
+            raise ValidationError(f'{s!r} Does NOT Match Expected Pattern')
+        return s
+    return Validator[match_regex]
 
 def BoolFunc(f: Callable[[T], bool], 
     msg: Optional[str] = None) -> TypeValidator[T]:
