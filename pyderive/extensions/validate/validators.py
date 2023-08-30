@@ -208,12 +208,13 @@ def union_validator(anno: Type,
     wrapped = list(args)
     annotations = []
     while wrapped:
-        anno = wrapped.pop()
-        origin, subargs = get_origin(anno), get_args(anno)
+        sanno = wrapped.pop()
+        origin, subargs = get_origin(sanno), get_args(sanno)
         if origin is None:
-            annotations.append(anno)
+            annotations.append(sanno)
             continue
-        elif origin is Annotated:
+        elif origin is Annotated \
+            and not any(isinstance(a, Validator) for a in subargs):
             wrapped.append(subargs[0])
         elif origin is Union:
             wrapped.extend(subargs)
@@ -290,7 +291,6 @@ def ref_validator(cls: Type, ref: ForwardRef, typecast: bool) -> TypeValidator:
         nglobals = getattr(sys.modules.get(module, None), '__dict__', {})
         nlocals  = dict(vars(cls))
         anno     = typing._eval_type(ref, nglobals, nlocals)
-        print('anno', anno)
         # generate validator
         return type_validator(anno, typecast)
     # generate validator 
@@ -298,6 +298,9 @@ def ref_validator(cls: Type, ref: ForwardRef, typecast: bool) -> TypeValidator:
     def validator(value: Any):
         return deref()(value)
     return validator 
+
+def identity(value: Any) -> Any:
+    return value
 
 def type_validator(anno: Type, 
     typecast: bool, cls: Optional[Type] = None) -> TypeValidator:
@@ -328,6 +331,9 @@ def type_validator(anno: Type,
     # check if dataclass instance
     if is_dataclass(anno) or is_stddataclass(anno):
         return dclass_validator(anno, typecast)
+    # check for `Any` annotation
+    if anno is Any:
+        return identity
     # check for `Annotated` validator definitions
     origin, args = get_origin(anno), get_args(anno)
     if origin is Annotated:

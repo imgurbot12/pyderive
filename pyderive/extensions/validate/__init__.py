@@ -36,9 +36,10 @@ __all__ = [
     'Min', 
     'Max', 
     'Range', 
-    'Length',
-    'Regex',
-    'BoolFunc',
+    'RangeLength', 
+    'Length', 
+    'Regex', 
+    'BoolFunc', 
     'IsAlNum',
 
     'has_validation',

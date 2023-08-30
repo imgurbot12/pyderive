@@ -144,10 +144,10 @@ def is_timedelta(value: 'Timedelta') -> timedelta:
 #** Init **#
 
 #: convert string directly into bytes using default encoding
-Bytes = Annotated[Union[str, bytes], Validator[is_bytes]]
+Bytes = Annotated[Union[str, bytes], PreValidator[is_bytes]]
 
 #: convert hexidecimal strings into bytes
-HexBytes = Annotated[Union[str, bytes], Validator[is_hexbytes]]
+HexBytes = Annotated[Union[str, bytes], PreValidator[is_hexbytes]]
 
 #: validate string is a url
 URL = Annotated[str, Validator[is_url]]

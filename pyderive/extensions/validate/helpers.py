@@ -7,7 +7,16 @@ from typing import Callable, Optional, Sized, TypeVar, Union
 from .validators import T, Validator, TypeValidator, ValidationError, chain_validators
 
 #** Variables **#
-__all__ = ['Min', 'Max', 'Range', 'Length', 'Regex', 'BoolFunc', 'IsAlNum']
+__all__ = [
+    'Min', 
+    'Max', 
+    'Range', 
+    'RangeLength', 
+    'Length', 
+    'Regex', 
+    'BoolFunc', 
+    'IsAlNum'
+]
 
 I = TypeVar('I', bound=Union[int, float])
 
@@ -59,6 +68,27 @@ def Length(l: int) -> TypeValidator:
             raise ValidationError(f'Cannot Take Size of {s!r}')
         if len(s) != l:
             raise ValidationError(f'{s!r} too long: {len(s)} > {l}')
+        return s
+    return Validator[length]
+
+def RangeLength(min: Optional[int] = None, 
+    max: Optional[int] = None) -> TypeValidator:
+    """
+    Generate RangeLength Validator for Lengthable Object
+
+    :param min: minimum length of object
+    :param max: maximum length of object
+    """
+    assert min or max, 'minimum or maximum must be set'
+    assert not min or min >= 0, 'minimum must be >= 0'
+    assert not max or max >= 0, 'maximum must be >= 0'
+    def length(s: Sized):
+        if not isinstance(s, Sized):
+            raise ValidationError(f'Cannot Take Size of {s!r}')
+        if min and len(s) < min:
+            raise ValidationError(f'{s!r} too short: {len(s)} < {min}')
+        if max is not None and len(s) > max:
+            raise ValidationError(f'{s!r} too long: {len(s)} > {min}')
         return s
     return Validator[length]
 
