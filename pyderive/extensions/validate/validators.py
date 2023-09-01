@@ -6,7 +6,7 @@ import sys
 import typing
 from enum import Enum
 from typing import *
-from typing_extensions import Annotated, get_origin, get_args
+from typing_extensions import Annotated, runtime_checkable, get_origin, get_args
 
 from ..serde import is_sequence
 from ...abc import FieldDef, FieldValidator
@@ -50,6 +50,13 @@ def _wrap(name: str) -> Callable[[Callable], Callable]:
         func.__qualname__ = func.__name__
         return func
     return wrapper
+
+@functools.lru_cache(maxsize=None)
+def _runtime_checkable(p: Type) -> Type:
+    try:
+        return runtime_checkable(p)
+    except TypeError:
+        return p
 
 def none_validator(value: Any):
     """
@@ -193,6 +200,28 @@ def enum_validator(anno: Type[Enum], typecast: bool) -> TypeValidator:
         raise ValidationError(f'Invalid {anno.__name__}: {value!r}')
     return validator
 
+def subclass_validator(anno: Type) -> TypeValidator:
+    """
+    generate subclass-validator for the specified type
+    
+    :param anno: base annotation
+    :return:     generated type validator
+    """
+    # ensure protocols are runtime-checkable
+    is_protocol = Protocol in anno.__mro__
+    if is_protocol:
+        anno = _runtime_checkable(anno)
+    # generate validator
+    @_wrap(_anno_name(anno))
+    def validator(value: Any):
+        if is_protocol:
+            if isinstance(value, type) and anno in value.__mro__:
+                return value
+        elif isinstance(value, type) and issubclass(value, anno):
+            return value
+        raise ValidationError(f'Invalid Subclass: {value!r}')
+    return validator
+
 def union_validator(anno: Type, 
     args: Tuple[Type, ...], validators: List[TypeValidator]) -> TypeValidator:
     """
@@ -334,6 +363,9 @@ def type_validator(anno: Type,
     # check for `Any` annotation
     if anno is Any:
         return identity
+    # ensure protocols are runtime-checkable
+    if isinstance(anno, type) and Protocol in anno.__mro__:
+        anno = _runtime_checkable(anno)
     # check for `Annotated` validator definitions
     origin, args = get_origin(anno), get_args(anno)
     if origin is Annotated:
@@ -347,6 +379,9 @@ def type_validator(anno: Type,
             elif isinstance(value, Validator):
                 middle.append(value.validator)
         return chain_validators([*pre, *middle, *post])
+    # check for `Type` annotation
+    if origin is type:
+        return subclass_validator(args[0])
     # check for `Union` annotation
     if origin is Union:
         validators = [type_validator(arg, typecast, cls) for arg in args]
