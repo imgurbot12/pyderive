@@ -144,10 +144,8 @@ def std_convert_fields(cls):
     :return:    stdlib dataclass fields list
     """
     # confirm class is pyderive dataclass
-    from .dataclasses import MISSING, is_dataclass, fields
+    from .dataclasses import MISSING, FIELD_ATTR, is_dataclass
     dataclasses = _import_std_dataclasses()
-    if dataclasses.is_dataclass(cls):
-        return dataclasses.fields(cls)
     if not is_dataclass(cls):
         raise ValueError(f'{cls!r} is not a pyderive dataclass')
     # generate translation layers
@@ -160,7 +158,7 @@ def std_convert_fields(cls):
         return dataclasses.MISSING if v is MISSING else v 
     # convert fields when required
     stdfields = []
-    for field in fields(cls):
+    for field in getattr(cls, FIELD_ATTR):
         # convert remaining attrs not contained in stdlib field into metadata
         metadata = {}
         for name, value in field.__dict__.items():

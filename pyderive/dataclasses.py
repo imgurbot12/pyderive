@@ -237,6 +237,7 @@ def _process_class(
     isdataclass = is_dataclass(cls)
     if not isdataclass and is_stddataclass(cls):
         convert_params(cls)
+        compat = True
     # parse and conregate fields
     struct = parse_fields(cls, factory=field, recurse=recurse)
     fields = flatten_fields(struct, order_kw=not kw_only)

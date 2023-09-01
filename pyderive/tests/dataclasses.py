@@ -46,7 +46,7 @@ class DataClassTests(unittest.TestCase):
             a: int
             b: dataclasses.InitVar[int]
             c: List[str] = dataclasses.field(default_factory=list, repr=False)
-        @dataclass
+        @dataclass(compat=True)
         class Bar(Foo):
             d: int = 0
             def __post_init__(self, b: int):
@@ -57,6 +57,9 @@ class DataClassTests(unittest.TestCase):
         self.assertListEqual(bar.c, [])
         self.assertTrue(hasattr(bar, 'extra'))
         self.assertEqual(bar.extra, 2)
+        self.assertTrue(is_dataclass(Bar))
+        self.assertTrue(dataclasses.is_dataclass(Bar))
+        self.assertTrue(len(dataclasses.fields(Bar)) == 3)
  
     def test_frozen(self):
         """validate frozen attribute works"""
