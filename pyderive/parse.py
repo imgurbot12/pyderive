@@ -145,7 +145,7 @@ def flatten_fields(
             elif name in kwargs:
                 kwargs.remove(name)
             # raise error if non-kwarg found after kwargs start
-            kwarg = not field.kw_only and kwargs
+            kwarg = kwargs and field.init and not field.kw_only
             if order_kw and kwarg and missing and not default:
                 raise TypeError(
                     f'non-default argument {name!r} follows default argument')
