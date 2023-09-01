@@ -16,6 +16,7 @@ __all__ = [
     'convert_fields', 
     'convert_params',
     'std_convert_fields',
+    'std_assign_fields',
     'std_convert_dataclass',
 ]
 
@@ -50,6 +51,12 @@ def monkey_patch():
         pass
     sys.modules[module_name] = derive
 
+def _import_std_dataclasses():
+    """import stdlib dataclasses library"""
+    dataclasses = stdlib_dataclasses or sys.modules.get(module_name)
+    dataclasses = dataclasses or importlib.import_module(module_name)
+    return dataclasses
+
 def is_stddataclass(cls) -> bool:
     """
     check to see if class is a stdlib dataclass
@@ -57,7 +64,7 @@ def is_stddataclass(cls) -> bool:
     :param cls: potential stdlib dataclass object
     :return:    true if cls is stdlib dataclass
     """
-    dataclasses = stdlib_dataclasses or sys.modules.get(module_name)
+    dataclasses = _import_std_dataclasses()
     if not dataclasses:
         return False
     return dataclasses.is_dataclass(cls)
@@ -71,7 +78,7 @@ def convert_fields(cls, field: Type[FieldDef]) -> Fields:
     :return:      converted field attributes
     """
     # ensure type is dataclass or return
-    dataclasses = stdlib_dataclasses or sys.modules.get(module_name)
+    dataclasses = _import_std_dataclasses() 
     if not dataclasses:
         return []
     if not dataclasses.is_dataclass(cls):
@@ -106,7 +113,7 @@ def convert_params(cls):
     """
     from .dataclasses import PARAMS_ATTR
     # ensure type is dataclass or return
-    dataclasses = stdlib_dataclasses or sys.modules.get(module_name)
+    dataclasses = _import_std_dataclasses()
     if not dataclasses:
         return
     if not dataclasses.is_dataclass(cls):
@@ -114,12 +121,6 @@ def convert_params(cls):
     # just move params attribute
     params = getattr(cls, dataclasses._PARAMS)
     setattr(cls, PARAMS_ATTR, params)
-
-def _import_std_dataclasses():
-    """import stdlib dataclasses library"""
-    dataclasses = stdlib_dataclasses or sys.modules.get(module_name)
-    dataclasses = dataclasses or importlib.import_module(module_name)
-    return dataclasses
 
 def _convert_anno(anno: Type):
     """convert annotation for valid stdlib dataclass"""
@@ -187,6 +188,20 @@ def std_convert_fields(cls):
                 std_convert_dataclass(stdfield.default_factory)
         stdfields.append(stdfield)
     return stdfields
+
+def std_assign_fields(cls):
+    """
+    convert pyderive dataclass fields to std dataclass fields and assign
+
+    :param cls: pyderive dataclass
+    :return:    stdlib compatable pyderive dataclass
+    """
+    dataclasses = _import_std_dataclasses()
+    if not dataclasses:
+        return cls
+    fields = std_convert_fields(cls)
+    setattr(cls, dataclasses._FIELDS, {f.name:f for f in fields})
+    return cls
 
 @lru_cache(maxsize=int(1e10))
 def std_convert_dataclass(cls, **kwargs):

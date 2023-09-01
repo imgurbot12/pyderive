@@ -9,7 +9,7 @@ from typing_extensions import dataclass_transform, runtime_checkable
 from .abc import *
 from .parse import *
 from .compile import *
-from .compat import is_stddataclass, convert_params
+from .compat import is_stddataclass, convert_params, std_assign_fields
 
 #** Variables **#
 __all__ = [
@@ -227,6 +227,7 @@ def _process_class(
     kw_only:     bool = False,
     slots:       bool = False,
     recurse:     bool = False,
+    compat:      bool = False,
     field:       Type[FieldDef] = Field,
 ) -> TypeT:
     # valdiate settings
@@ -303,6 +304,9 @@ def _process_class(
     # add slots
     if slots:
         cls = add_slots(cls, fields, freeze)
+    # include std-dataclass fields if compat is enabled
+    if compat:
+        cls = std_assign_fields(cls)
     # update abstraction-methods on re-creation and return
     if hasattr(abc, 'update_abstractmethods'):
         abc.update_abstractmethods(cls) #type: ignore
@@ -321,6 +325,7 @@ def dataclass(cls: Type[T],
     kw_only:     bool = False,
     slots:       bool = False,
     recurse:     bool = False,
+    compat:      bool = False,
     field:       Type[FieldDef] = Field,
 ) -> Type[T]:
     ...
@@ -337,6 +342,7 @@ def dataclass(*,
     kw_only:     bool = False,
     slots:       bool = False,
     recurse:     bool = False,
+    compat:      bool = False,
     field:       Type[FieldDef] = Field,
 ) -> DataFunc:
     ...
@@ -356,6 +362,7 @@ def dataclass(cls: Optional[TypeT] = None, *_, **kw) -> Union[TypeT, DataFunc]:
     :param kw_only:     fields are keyword-only
     :param slots:       enable slots generation
     :param recurse:     recursively search and compile fields from base-classes
+    :param compat:      generate stdlib dataclass fields to support inter-compat
     :param field:       field-factory baseclass
     :return:            dataclass type object
     """
