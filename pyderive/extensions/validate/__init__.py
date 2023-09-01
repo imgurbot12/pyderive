@@ -100,7 +100,9 @@ def validate(cls = None, typecast: bool = False, **kwargs):
         for f in fields:
             f.validator = f.validator or field_validator(cls, f, typecast)
             # recursively configure dataclass annotations
-            if is_dataclass(f.anno) and not hasattr(f.anno, VALIDATE_ATTR):
+            sparams        = getattr(f.anno, PARAMS_ATTR, None)
+            has_validation = hasattr(f.anno, VALIDATE_ATTR)
+            if sparams and sparams.init is not False and not has_validation:
                 f.anno = validate(f.anno, typecast)
         # regenerate init to include new validators
         post_init = hasattr(cls, POST_INIT)

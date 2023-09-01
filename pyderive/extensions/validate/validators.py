@@ -66,7 +66,7 @@ def simple_validator(cast: Type[T], typecast: bool) -> TypeValidator[T]:
     :param typecast: allow typecasting if true
     :return:         type-validator that attempts typecast
     """
-    name = cast.__name__
+    name = _anno_name(cast)
     @_wrap(name)
     def validator(value: Any) -> Any:
         if isinstance(value, cast):
