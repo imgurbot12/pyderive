@@ -99,8 +99,9 @@ def parse_fields(
             else:
                 field = factory(name, anno, default)
             # handle InitVar
-            if not isinstance(anno, type) and isinstance(anno, InitVar):
-                field.anno = anno.type
+            inner_anno = get_initvar(anno)
+            if inner_anno:
+                field.anno = inner_anno
                 field.field_type = FieldType.INIT_VAR 
             # finalize field build and assign to struct
             field.__compile__(cls)

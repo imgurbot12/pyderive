@@ -4,11 +4,13 @@ Custom DataClass Internal Types
 from abc import abstractmethod
 from enum import IntEnum
 from typing import *
-from typing_extensions import Self, runtime_checkable
+from typing_extensions import Annotated, Self, \
+    runtime_checkable, get_origin, get_args
 
 #** Variables **#
 __all__ = [
     'has_default',
+    'get_initvar',
 
     'T',
     'F',
@@ -38,6 +40,9 @@ F = TypeVar('F', bound='FieldDef')
 #: generic typevar bound to type
 TypeT = TypeVar('TypeT', bound=Type)
 
+#: InitVar Implementation
+InitVar = Annotated[T, 'INIT-VAR']
+
 #: typehint for dataclass creator function
 DataFunc = Callable[[TypeT], TypeT] 
 
@@ -62,17 +67,16 @@ def has_default(field: 'FieldDef') -> bool:
     """return true if field has default"""
     return field.default is not MISSING or field.default_factory is not MISSING
 
+def get_initvar(anno: Type) -> Optional[Type]:
+    """return inner annotation if annotation is init-var"""
+    origin, args = get_origin(anno), get_args(anno)
+    if origin is Annotated and len(args) == 2 and args[1] == 'INIT-VAR':
+        return args[0]
+
 #** Classes **#
 
 class MISSING:
     pass
-
-class InitVar(Generic[T]):
-    __slots__ = ('type', )
-    def __init__(self, type):
-        self.type = type
-    def __class_getitem__(cls, type):
-        return cls(type)
 
 class FrozenInstanceError(AttributeError):
     pass
