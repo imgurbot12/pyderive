@@ -70,19 +70,21 @@ def has_validation(cls) -> bool:
     return is_dataclass(cls) and hasattr(cls, VALIDATE_ATTR)
 
 @overload
-def validate(cls: None = None, typecast: bool = False, **kwargs) -> DataFunc:
+def validate(cls: None = None, **kwargs) -> DataFunc:
     ...
 
 @overload
-def validate(cls: TypeT, typecast: bool = False, **kwargs) -> TypeT:
+def validate(cls: TypeT, **kwargs) -> TypeT:
     ...
 
 @dataclass_transform()
-def validate(cls = None, typecast: bool = False, **kwargs):
+def validate(cls = None, *, 
+    recurse: bool = False, typecast: bool = False, **kwargs):
     """
     validation decorator to use on top of an existing dataclass
 
     :param cls:      dataclass instance
+    :param recurse:  allow recusive validation of dataclasses
     :param typecast: enable typecasting during validation
     :param kwargs:   kwargs to apply when generating dataclass
     :return:         same dataclass instance now validation wrapped
@@ -102,8 +104,9 @@ def validate(cls = None, typecast: bool = False, **kwargs):
             # recursively configure dataclass annotations
             sparams        = getattr(f.anno, PARAMS_ATTR, None)
             has_validation = hasattr(f.anno, VALIDATE_ATTR)
-            if sparams and sparams.init is not False and not has_validation:
-                f.anno = validate(f.anno, typecast)
+            do_validate    = recurse and sparams and sparams.init is not False
+            if do_validate and not has_validation:
+                f.anno = validate(f.anno, recurse=recurse, tyepcast=typecast)
         # regenerate init to include new validators
         post_init = hasattr(cls, POST_INIT)
         func = create_init(fields, params.kw_only, post_init, params.frozen)
@@ -133,7 +136,7 @@ class BaseModel:
         :param kwargs:   extra arguments to pass to dataclass generation
         """
         dataclass(cls, slots=False, **kwargs)
-        validate(cls, typecast)
+        validate(cls, typecast=typecast)
         if slots:
             setattr(cls, '__slots__', gen_slots(cls, fields(cls)))
  
