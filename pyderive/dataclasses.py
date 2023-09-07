@@ -235,9 +235,10 @@ def _process_class(
         raise ValueError('eq must be true if order is true')
     # convert params for stdlib dataclasses
     isdataclass = is_dataclass(cls)
-    if not isdataclass and is_stddataclass(cls):
+    isstddataclass = is_stddataclass(cls)
+    compat = compat or isstddataclass
+    if not isdataclass and isstddataclass:
         convert_params(cls)
-        compat = True
     # parse and conregate fields
     struct = parse_fields(cls, factory=field, recurse=recurse)
     fields = flatten_fields(struct, order_kw=not kw_only)

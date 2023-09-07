@@ -128,15 +128,16 @@ class BaseModel:
     PyDantic Inspirted Validation Model MetaClass
     """
 
-    def __init_subclass__(cls, 
+    def __init_subclass__(cls, recurse: bool = False, 
         typecast: bool = False, slots: bool = True, **kwargs):
         """
+        :param recurse:  allow recusive validation of dataclasses
         :param typecast: allow typecasting of input values
         :param slots:    add slots to the model object
         :param kwargs:   extra arguments to pass to dataclass generation
         """
         dataclass(cls, slots=False, **kwargs)
-        validate(cls, typecast=typecast)
+        validate(cls, recurse=recurse, typecast=typecast)
         if slots:
             setattr(cls, '__slots__', gen_slots(cls, fields(cls)))
  
