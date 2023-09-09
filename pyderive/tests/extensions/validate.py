@@ -2,14 +2,14 @@
 PyDerive Validation Extension UnitTests
 """
 from enum import Enum
-from typing import Dict, List, Set, Tuple, Union
+from typing import Dict, List, Set, Tuple, TypeVar, Union, Generic
 from unittest import TestCase
 
 from ...dataclasses import dataclass
 from ...extensions.validate import ValidationError, BaseModel, validate
 
 #** Variables **#
-__all__ = ['ValidationTests', 'ValidationModelTests']
+__all__ = ['ValidationTests', 'ValidationModelTests', 'GenericValidationTests']
 
 #** Classes **#
 
@@ -228,3 +228,62 @@ class ValidationModelTests(TestCase):
         self.assertEqual(foo.a, 'a')
         self.assertRaises(ValidationError, Foo, '1', 'a')
         self.assertRaises(ValidationError, Foo, 1, 2)
+
+class GenericValidationTests(TestCase):
+    """Validation for Generics UnitTests"""
+ 
+    def test_simple(self):
+        """test simple generics assignemnt"""
+        T = TypeVar('T')
+        class Foo(BaseModel, Generic[T]):
+            value: T
+        class Bar(Foo[int]):
+            pass
+        class Baz(Foo[int], typecast=True):
+            pass
+        self.assertEqual(Foo(1).value, 1)
+        self.assertEqual(Foo('a').value, 'a')
+        self.assertEqual(Foo(1.0).value, 1.0)
+        self.assertEqual(Foo([]).value, [])
+        self.assertRaises(ValidationError, Bar, '1')
+        self.assertRaises(ValidationError, Bar, 1.0)
+        self.assertEqual(Baz(1).value, 1)
+        self.assertEqual(Baz('1').value, 1)
+        self.assertEqual(Baz(1.0).value, 1)
+
+    def test_typevars(self):
+        """test more complex typevars with generics"""
+        T = TypeVar('T', bound=Union[int, float, bool])
+        class Foo(BaseModel, Generic[T]):
+            a: T
+            b: List[T]
+            c: Tuple[str, T]
+        class Bar(Foo[int]):
+            pass
+        foo = Foo(1, [2, 3.0], ('a', False))
+        _   = Bar(1, [2, 3], ('a', 4))
+        self.assertEqual(foo.a, 1)
+        self.assertListEqual(foo.b, [2, 3.0])
+        self.assertTupleEqual(foo.c, ('a', False))
+        self.assertRaises(ValidationError, Foo, 1, [2], ('a', 'b'))
+        self.assertRaises(ValidationError, Foo, 1, ['a'], ('b', 2))
+        self.assertRaises(ValidationError, Foo, 'a', [2], ('b', 3.0))
+        self.assertRaises(ValidationError, Bar, 1, [2], ('a', 3.0))
+        self.assertRaises(ValidationError, Bar, 1, [2.0], ('a', 3))
+        self.assertRaises(ValidationError, Bar, 1.0, [2], ('a', 3))
+
+    def test_complex(self):
+        """test complex generic setup w/ heigharchy of validators"""
+        T = TypeVar('T', bound=Union[int, float, bool])
+        class Foo(BaseModel, Generic[T]):
+            x: T
+        class Bar(BaseModel, Generic[T]):
+            a:   T
+            foo: Foo[T]
+        class Baz(Bar[int]):
+            pass
+        bar = Bar(1, Foo(2.0))
+        self.assertEqual(bar.a, 1)
+        self.assertEqual(bar.foo.x, 2.0)
+        self.assertRaises(ValidationError, Baz, 'a', Foo(1))
+        self.assertRaises(ValidationError, Baz, 1, Foo(2.0))

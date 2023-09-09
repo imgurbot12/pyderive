@@ -1,10 +1,11 @@
 """
 PyDantic Inspired Pyderive Validator Extensions
 """
-from typing import Any, overload
+from typing import Any, Tuple, Type, overload
 from typing_extensions import Self, dataclass_transform
 
 from .types import *
+from .generic import *
 from .helpers import *
 from .validators import *
 
@@ -96,10 +97,21 @@ def validate(cls = None, *,
         if not is_dataclass(cls):
             kwargs.setdefault('slots', True)
             cls = dataclass(cls, init=False, **kwargs) #type: ignore
+        # update generics if present in dataclass
+        if has_generics(cls):
+            update_generics(cls)
+            setattr(cls, '__class_getitem__', generic_getitem)
+        # retrieve previous validate-params if they exist
+        nparams   = ValidateParams(typecast)
+        vparams   = getattr(cls, VALIDATE_ATTR, None)
+        different = vparams and vparams != nparams
         # append validators to the field definitions
         fields = getattr(cls, FIELD_ATTR)
         params = getattr(cls, PARAMS_ATTR)
         for f in fields:
+            # update validators if params have changed or were never assigned
+            if different and f.validator and is_autogen(f.validator):
+                f.validator = None
             f.validator = f.validator or field_validator(cls, f, typecast)
             # recursively configure dataclass annotations
             sparams        = getattr(f.anno, PARAMS_ATTR, None)
@@ -112,7 +124,7 @@ def validate(cls = None, *,
         func = create_init(fields, params.kw_only, post_init, params.frozen)
         assign_func(cls, func, overwrite=True)
         # set validate-attr and preserve configuration settings
-        setattr(cls, VALIDATE_ATTR, ValidateParams(typecast))        
+        setattr(cls, VALIDATE_ATTR, nparams)
         return cls
     return wrapper if cls is None else wrapper(cls)
 
@@ -136,6 +148,12 @@ class BaseModel:
         :param slots:    add slots to the model object
         :param kwargs:   extra arguments to pass to dataclass generation
         """
+        # copy genrics from baseclasses
+        bases = getattr(cls, BASES_ATTR, [])
+        valid = [base for base in bases if hasattr(base, GENERIC_PARAMS)]
+        if valid:
+            setattr(cls, GENERIC_PARAMS, getattr(valid[0], GENERIC_PARAMS))
+        # generate dataclass and validations
         dataclass(cls, slots=False, **kwargs)
         validate(cls, recurse=recurse, typecast=typecast)
         if slots:

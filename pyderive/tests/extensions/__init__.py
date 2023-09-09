@@ -6,7 +6,8 @@ PyDerive Extensions Tests
 __all__ = [
     'SerdeTests',
     'ValidationTests', 
-    'ValidationModelTests'
+    'ValidationModelTests',
+    'GenericValidationTests',
 ]
 
 #** Imports **#

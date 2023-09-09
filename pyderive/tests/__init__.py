@@ -7,7 +7,8 @@ __all__ = [
     'DataClassTests', 
     'SerdeTests',
     'ValidationTests', 
-    'ValidationModelTests'
+    'ValidationModelTests',
+    'GenericValidationTests',
 ]
 
 #** Imports **#
