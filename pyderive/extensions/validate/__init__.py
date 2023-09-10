@@ -1,7 +1,8 @@
 """
 PyDantic Inspired Pyderive Validator Extensions
 """
-from typing import Any, Tuple, Type, overload
+from abc import abstractmethod
+from typing import Any, Iterator, overload
 from typing_extensions import Self, dataclass_transform
 
 from .types import *
@@ -178,10 +179,14 @@ class BaseModel:
         """
         return from_object(cls, value, **kwargs)
 
-class BaseTuple(BaseModel, tuple):
+class BaseTuple(BaseModel):
     """
     Expansion on BaseModel w/ builtin tuple Deconstruction
     """
+
+    @abstractmethod
+    def __iter__(self) -> Iterator[Any]:
+        return NotImplemented
 
     def __init_subclass__(cls, iter: bool = True, **kwargs):
         super().__init_subclass__(iter=iter, **kwargs)
