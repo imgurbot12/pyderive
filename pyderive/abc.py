@@ -95,6 +95,7 @@ class FieldDef(Protocol):
     repr:            bool           = True
     hash:            Optional[bool] = None
     compare:         bool           = True
+    iter:            bool           = True
     kw_only:         bool           = False
     frozen:          bool           = False
     validator:       OptValidator   = None
@@ -120,6 +121,7 @@ class Field(FieldDef):
         repr:            bool           = True,
         hash:            Optional[bool] = None,
         compare:         bool           = True,
+        iter:            bool           = True,
         kw_only:         bool           = False,
         frozen:          bool           = False,
         validator:       OptValidator   = None,
@@ -135,6 +137,7 @@ class Field(FieldDef):
         self.hash            = hash
         self.compare         = compare
         self.kw_only         = kw_only
+        self.iter            = iter
         self.frozen          = frozen
         self.validator       = validator
         self.metadata        = metadata or {}

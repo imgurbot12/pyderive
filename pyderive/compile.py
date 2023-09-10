@@ -17,6 +17,7 @@ __all__ = [
     'create_repr',
     'create_compare',
     'create_hash',
+    'create_iter',
     'assign_func',
     'gen_slots',
     'add_slots',
@@ -229,6 +230,17 @@ def create_hash(fields: Fields) -> Callable:
         if (f.compare if f.hash is None else f.hash)]
     names_t = _tuple_str(names, 'self')
     return _create_fn('__hash__', ['self'], [f'return hash({names_t})'])
+
+def create_iter(fields: Fields) -> Callable:
+    """
+    generate iter-function to iterate over all fields
+
+    :param fields: ordered fields used to generate iter-function
+    :return:       iter-function
+    """
+    names   = [f.name for f in _stdfields(fields) if f.iter]
+    names_t = _tuple_str(names, 'self')
+    return _create_fn('__iter__', ['self'], [f'return iter({names_t})'])
 
 def assign_func(cls: Type, func: Callable, 
     name: Optional[str] = None, overwrite: bool = False) -> bool:

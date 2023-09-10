@@ -50,6 +50,7 @@ __all__ = [
     'register_validator',
 
     'BaseModel',
+    'BaseTuple',
     'Validator',
     'PreValidator',
     'PostValidator',
@@ -176,3 +177,11 @@ class BaseModel:
         :return:       model instance
         """
         return from_object(cls, value, **kwargs)
+
+class BaseTuple(BaseModel, tuple):
+    """
+    Expansion on BaseModel w/ builtin tuple Deconstruction
+    """
+
+    def __init_subclass__(cls, iter: bool = True, **kwargs):
+        super().__init_subclass__(iter=iter, **kwargs)

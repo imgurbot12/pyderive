@@ -219,6 +219,7 @@ def _process_class(
     cls: TypeT,
     init:        Optional[bool] = None,
     repr:        Optional[bool] = None,
+    iter:        Optional[bool] = None,
     eq:          bool = True,
     order:       bool = False,
     unsafe_hash: bool = False,
@@ -248,7 +249,7 @@ def _process_class(
         for f in fields:
             f.kw_only = True
     # validate settings and save fields/params
-    params = DataParams(init, repr, eq, order, unsafe_hash, 
+    params = DataParams(init, repr, iter, eq, order, unsafe_hash, 
         frozen, match_args, kw_only, slots, recurse, field)
     if isdataclass:
         ofields = getattr(cls, FIELD_ATTR)
@@ -276,6 +277,9 @@ def _process_class(
     if repr or repr is None:
         overwrite = repr is True
         assign_func(cls, create_repr(fields), overwrite=overwrite)
+    if iter or iter is None or any(f.iter for f in fields):
+        overwrite = iter is True
+        assign_func(cls, create_iter(fields), overwrite=overwrite)
     if eq:
         assign_func(cls, create_compare(fields, '__eq__', '=='))
     if order:
@@ -326,6 +330,7 @@ def dataclass(cls: Type[T],
     match_args:  bool = True,
     kw_only:     bool = False,
     slots:       bool = False,
+    iter:        bool = False,
     recurse:     bool = False,
     compat:      bool = False,
     field:       Type[FieldDef] = Field,
@@ -343,6 +348,7 @@ def dataclass(*,
     match_args:  bool = True,
     kw_only:     bool = False,
     slots:       bool = False,
+    iter:        bool = False,
     recurse:     bool = False,
     compat:      bool = False,
     field:       Type[FieldDef] = Field,
@@ -385,9 +391,10 @@ class DataParams:
     __slots__ = (
         'init', 
         'repr',
+        'iter',
         'eq', 
         'order', 
-        'unsafe_hash', 
+        'unsafe_hash',
         'frozen', 
         'match_args', 
         'kw_only', 
@@ -398,6 +405,7 @@ class DataParams:
     def __init__(self,
         init:        Optional[bool],
         repr:        Optional[bool],
+        iter:        Optional[bool],
         eq:          bool,
         order:       bool,
         unsafe_hash: bool,
@@ -410,6 +418,7 @@ class DataParams:
     ):
         self.init        = init
         self.repr        = repr
+        self.iter        = iter
         self.eq          = eq
         self.order       = order
         self.unsafe_hash = unsafe_hash
