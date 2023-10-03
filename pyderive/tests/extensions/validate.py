@@ -6,7 +6,7 @@ from typing import Dict, List, Set, Tuple, TypeVar, Union, Generic
 from unittest import TestCase
 
 from ...dataclasses import dataclass
-from ...extensions.validate import ValidationError, BaseModel, validate
+from ...extensions.validate import FieldValidationError, BaseModel, validate
 
 #** Variables **#
 __all__ = ['ValidationTests', 'ValidationModelTests', 'GenericValidationTests']
@@ -24,9 +24,9 @@ class ValidationTests(TestCase):
             b: str
             c: float
         Foo(1, 'ok', 2.1)
-        self.assertRaises(ValidationError, Foo, 1.2, 'a', 3.4)
-        self.assertRaises(ValidationError, Foo, 5, 6, 7)
-        self.assertRaises(ValidationError, Foo, 9, 'c', 10)
+        self.assertRaises(FieldValidationError, Foo, 1.2, 'a', 3.4)
+        self.assertRaises(FieldValidationError, Foo, 5, 6, 7)
+        self.assertRaises(FieldValidationError, Foo, 9, 'c', 10)
     
     def test_typecast_simple(self):
         """ensure simple typecasting works"""
@@ -48,14 +48,14 @@ class ValidationTests(TestCase):
             a: List[int]
             b: Set[float]
         Foo([1, 2, 3], {1.1, 2.2, 3.3})
-        self.assertRaises(ValidationError, Foo, (1, 2, 3), {1.1, 2.2, 3.3})
-        self.assertRaises(ValidationError, Foo, {1, 2, 3}, {1.1, 2.2, 3.3})
-        self.assertRaises(ValidationError, Foo, [1, 2, 3], [1.1, 2.2, 3.3])
-        self.assertRaises(ValidationError, Foo, [1, 2, 3], (1.1, 2.2, 3.3))
-        self.assertRaises(ValidationError, Foo, [1, 2, '3'], {1.1, 2.2, 3.3})
-        self.assertRaises(ValidationError, Foo, [1, 2, 3.0], {1.1, 2.2, 3.3})
-        self.assertRaises(ValidationError, Foo, [1, 2, 3], {1.1, 2.2, 3})
-        self.assertRaises(ValidationError, Foo, [1, 2, 3], {'1.1', 2.2, 3.3})
+        self.assertRaises(FieldValidationError, Foo, (1, 2, 3), {1.1, 2.2, 3.3})
+        self.assertRaises(FieldValidationError, Foo, {1, 2, 3}, {1.1, 2.2, 3.3})
+        self.assertRaises(FieldValidationError, Foo, [1, 2, 3], [1.1, 2.2, 3.3])
+        self.assertRaises(FieldValidationError, Foo, [1, 2, 3], (1.1, 2.2, 3.3))
+        self.assertRaises(FieldValidationError, Foo, [1, 2, '3'], {1.1, 2.2, 3.3})
+        self.assertRaises(FieldValidationError, Foo, [1, 2, 3.0], {1.1, 2.2, 3.3})
+        self.assertRaises(FieldValidationError, Foo, [1, 2, 3], {1.1, 2.2, 3})
+        self.assertRaises(FieldValidationError, Foo, [1, 2, 3], {'1.1', 2.2, 3.3})
     
     def test_typecast_sequence(self):
         """ensure sequence typecasting works"""
@@ -78,14 +78,14 @@ class ValidationTests(TestCase):
             a: Tuple[int, float, str]
             b: Tuple[int, ...]
         Foo((1, 1.2, 'ok'), (1, 2, 3, 4, 5))
-        self.assertRaises(ValidationError, Foo, [1, 1.2, 'ok'], (1, ))
-        self.assertRaises(ValidationError, Foo, (1, 1.2, 'ok'), [1, ])
-        self.assertRaises(ValidationError, Foo, (1, 1.2, ), (1, ))
-        self.assertRaises(ValidationError, Foo, (1, 1.2, 'ok', 3), (1, ))
-        self.assertRaises(ValidationError, Foo, (1.1, 1.2, 'ok'), (1, ))
-        self.assertRaises(ValidationError, Foo, (1, 2, 'ok'), (1, ))
-        self.assertRaises(ValidationError, Foo, (1, 1.2, 3), (1, ))
-        self.assertRaises(ValidationError, Foo, (1, 1.2, 'ok'), (1, 'ok', ))
+        self.assertRaises(FieldValidationError, Foo, [1, 1.2, 'ok'], (1, ))
+        self.assertRaises(FieldValidationError, Foo, (1, 1.2, 'ok'), [1, ])
+        self.assertRaises(FieldValidationError, Foo, (1, 1.2, ), (1, ))
+        self.assertRaises(FieldValidationError, Foo, (1, 1.2, 'ok', 3), (1, ))
+        self.assertRaises(FieldValidationError, Foo, (1.1, 1.2, 'ok'), (1, ))
+        self.assertRaises(FieldValidationError, Foo, (1, 2, 'ok'), (1, ))
+        self.assertRaises(FieldValidationError, Foo, (1, 1.2, 3), (1, ))
+        self.assertRaises(FieldValidationError, Foo, (1, 1.2, 'ok'), (1, 'ok', ))
  
     def test_typecast_tuple(self):
         """ensure tuple typecasting works properly"""
@@ -96,8 +96,8 @@ class ValidationTests(TestCase):
         foo1 = Foo((1, 1.2, 'ok'), (1, 2, 3, 4, 5))
         foo2 = Foo([1.0, '1.2', 'ok'], [1, 2.0, '3', 4, 5])
         self.assertEqual(foo1, foo2)
-        self.assertRaises(ValidationError, Foo, (1, 1.2, ), (1, ))
-        self.assertRaises(ValidationError, Foo, (1, 1.2, 'ok', 3), (1, ))
+        self.assertRaises(FieldValidationError, Foo, (1, 1.2, ), (1, ))
+        self.assertRaises(FieldValidationError, Foo, (1, 1.2, 'ok', 3), (1, ))
 
     def test_union(self):
         """ensure union validation works properly"""
@@ -105,9 +105,9 @@ class ValidationTests(TestCase):
         class Foo:
             a: Union[int, str]
         _ = Foo(1), Foo('ok')
-        self.assertRaises(ValidationError, Foo, 1.1)
-        self.assertRaises(ValidationError, Foo, [])
-        self.assertRaises(ValidationError, Foo, object())
+        self.assertRaises(FieldValidationError, Foo, 1.1)
+        self.assertRaises(FieldValidationError, Foo, [])
+        self.assertRaises(FieldValidationError, Foo, object())
     
     def test_typecast_union(self):
         """ensure union typecasting works properly"""
@@ -128,10 +128,10 @@ class ValidationTests(TestCase):
         class Foo:
             a: E
         _ = Foo(E.A), Foo(E.B)
-        self.assertRaises(ValidationError, Foo, 'A')
-        self.assertRaises(ValidationError, Foo, 'B')
-        self.assertRaises(ValidationError, Foo, 'foo')
-        self.assertRaises(ValidationError, Foo, 'bar')
+        self.assertRaises(FieldValidationError, Foo, 'A')
+        self.assertRaises(FieldValidationError, Foo, 'B')
+        self.assertRaises(FieldValidationError, Foo, 'foo')
+        self.assertRaises(FieldValidationError, Foo, 'bar')
 
     def test_typecast_enum(self):
         """ensure enum typecasting works properly"""
@@ -148,7 +148,7 @@ class ValidationTests(TestCase):
         self.assertEqual(foo1, foo5)
         self.assertEqual(foo2, foo4)
         self.assertEqual(foo2, foo6)
-        self.assertRaises(ValidationError, Foo, 'asdf')
+        self.assertRaises(FieldValidationError, Foo, 'asdf')
 
 class ValidationModelTests(TestCase):
     """Validator BaseModel UnitTests"""
@@ -160,9 +160,9 @@ class ValidationModelTests(TestCase):
             b: str
             c: float
         Foo(1, 'ok', 2.1)
-        self.assertRaises(ValidationError, Foo, 1.2, 'a', 3.4)
-        self.assertRaises(ValidationError, Foo, 5, 6, 7)
-        self.assertRaises(ValidationError, Foo, 9, 'c', 10)
+        self.assertRaises(FieldValidationError, Foo, 1.2, 'a', 3.4)
+        self.assertRaises(FieldValidationError, Foo, 5, 6, 7)
+        self.assertRaises(FieldValidationError, Foo, 9, 'c', 10)
 
     def test_model_typecast(self):
         """validate `BaseModel` can typecast values"""
@@ -183,7 +183,7 @@ class ValidationModelTests(TestCase):
         foo = Foo(['a', 'b', 'c'])
         foo.validate()
         foo.a.extend(['d', 1])
-        self.assertRaises(ValidationError, foo.validate)
+        self.assertRaises(FieldValidationError, foo.validate)
     
     def test_model_parsing(self):
         """ensure `BaseModel.parse_obj` function works as intended"""
@@ -195,7 +195,7 @@ class ValidationModelTests(TestCase):
         foo1 = Foo.parse_obj({'a': (1, 'ok', 2.1), 'bar': {'x': 1.1}})
         foo2 = Foo.parse_obj(((1, 'ok', 2.1), [1.1]))
         self.assertEqual(foo1, foo2)
-        self.assertRaises(ValidationError, Foo.parse_obj, {'a': (1.0, 'ok', 2.1), 'bar': {'x': 'ok'}})
+        self.assertRaises(FieldValidationError, Foo.parse_obj, {'a': (1.0, 'ok', 2.1), 'bar': {'x': 'ok'}})
  
     def test_model_complex(self):
         """ensure `BaseModel`.valdiate function works on complex objects"""
@@ -211,10 +211,10 @@ class ValidationModelTests(TestCase):
         foo4 = {'d': {'k1': {'i': ('a', 1, 1.1)}}, 'l': [7, 8], 't': (True, {'i': ('b', 2, 2)}, 3)}
         foo5 = {'d': {'k1': {'i': ('a', 1, 1.1)}}, 'l': [7, 8], 't': (True, {'i': ('b', 2.2)}, 3)}
         Foo.parse_obj(foo1)
-        self.assertRaises(ValidationError, Foo.parse_obj, foo2)
-        self.assertRaises(ValidationError, Foo.parse_obj, foo3)
-        self.assertRaises(ValidationError, Foo.parse_obj, foo4)
-        self.assertRaises(ValidationError, Foo.parse_obj, foo5)
+        self.assertRaises(FieldValidationError, Foo.parse_obj, foo2)
+        self.assertRaises(FieldValidationError, Foo.parse_obj, foo3)
+        self.assertRaises(FieldValidationError, Foo.parse_obj, foo4)
+        self.assertRaises(FieldValidationError, Foo.parse_obj, foo5)
 
     def test_model_subclass(self):
         """test `BaseModel` inherritance of another dataclass"""
@@ -226,8 +226,8 @@ class ValidationModelTests(TestCase):
         foo = Foo(1, 'a')
         self.assertEqual(foo.x, 1)
         self.assertEqual(foo.a, 'a')
-        self.assertRaises(ValidationError, Foo, '1', 'a')
-        self.assertRaises(ValidationError, Foo, 1, 2)
+        self.assertRaises(FieldValidationError, Foo, '1', 'a')
+        self.assertRaises(FieldValidationError, Foo, 1, 2)
 
 class GenericValidationTests(TestCase):
     """Validation for Generics UnitTests"""
@@ -245,8 +245,8 @@ class GenericValidationTests(TestCase):
         self.assertEqual(Foo('a').value, 'a')
         self.assertEqual(Foo(1.0).value, 1.0)
         self.assertEqual(Foo([]).value, [])
-        self.assertRaises(ValidationError, Bar, '1')
-        self.assertRaises(ValidationError, Bar, 1.0)
+        self.assertRaises(FieldValidationError, Bar, '1')
+        self.assertRaises(FieldValidationError, Bar, 1.0)
         self.assertEqual(Baz(1).value, 1)
         self.assertEqual(Baz('1').value, 1)
         self.assertEqual(Baz(1.0).value, 1)
@@ -265,12 +265,12 @@ class GenericValidationTests(TestCase):
         self.assertEqual(foo.a, 1)
         self.assertListEqual(foo.b, [2, 3.0])
         self.assertTupleEqual(foo.c, ('a', False))
-        self.assertRaises(ValidationError, Foo, 1, [2], ('a', 'b'))
-        self.assertRaises(ValidationError, Foo, 1, ['a'], ('b', 2))
-        self.assertRaises(ValidationError, Foo, 'a', [2], ('b', 3.0))
-        self.assertRaises(ValidationError, Bar, 1, [2], ('a', 3.0))
-        self.assertRaises(ValidationError, Bar, 1, [2.0], ('a', 3))
-        self.assertRaises(ValidationError, Bar, 1.0, [2], ('a', 3))
+        self.assertRaises(FieldValidationError, Foo, 1, [2], ('a', 'b'))
+        self.assertRaises(FieldValidationError, Foo, 1, ['a'], ('b', 2))
+        self.assertRaises(FieldValidationError, Foo, 'a', [2], ('b', 3.0))
+        self.assertRaises(FieldValidationError, Bar, 1, [2], ('a', 3.0))
+        self.assertRaises(FieldValidationError, Bar, 1, [2.0], ('a', 3))
+        self.assertRaises(FieldValidationError, Bar, 1.0, [2], ('a', 3))
 
     def test_complex(self):
         """test complex generic setup w/ heigharchy of validators"""
@@ -285,5 +285,5 @@ class GenericValidationTests(TestCase):
         bar = Bar(1, Foo(2.0))
         self.assertEqual(bar.a, 1)
         self.assertEqual(bar.foo.x, 2.0)
-        self.assertRaises(ValidationError, Baz, 'a', Foo(1))
-        self.assertRaises(ValidationError, Baz, 1, Foo(2.0))
+        self.assertRaises(FieldValidationError, Baz, 'a', Foo(1))
+        self.assertRaises(FieldValidationError, Baz, 1, Foo(2.0))

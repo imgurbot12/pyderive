@@ -4,7 +4,7 @@ Serde Serialization/Deserialization Tools/Baseclasses
 import ipaddress
 from abc import abstractmethod
 from typing import *
-from typing_extensions import get_origin, get_args
+from typing_extensions import runtime_checkable, get_origin, get_args
 
 from ... import BaseField
 from ...abc import MISSING, FieldDef, InitVar, has_default
@@ -32,6 +32,7 @@ __all__ = [
     'to_tuple',
 
     'SerdeError',
+    'SerdeParseError',
     'SerdeParams',
     'SerdeField',
     'TypeEncoder',
@@ -156,37 +157,75 @@ def namedtuple_annos(anno: Type) -> Tuple[List[str], Tuple[Type, ...]]:
     args     = [annodict.get(field, str) for field in fields]
     return (fields, tuple(args))
 
-def _unexpected(name: str, anno: Type, value: Any):
+def _unexpected(name: str, anno: Type, value: Any, path: List[str]):
     """raise unexpected type error when parsing objects"""
-    return SerdeError(
-        f'Field: {name!r} Expected: {anno!r}, Got: {type(value)!r}')
+    return SerdeParseError(
+        f'Field: {name!r} Expected: {anno!r}, Got: {type(value)!r}', path)
 
-def _parse_tuple(name: str, anno: Type, names: Sequence[str],
-    args: Sequence[Type], value: Any, decoder: 'TypeDecoder', kwargs) -> tuple:
-    """parse tuple value according to annotation"""
+def _parse_tuple(
+    name:    str, 
+    anno:    Type, 
+    names:   Sequence[str], 
+    args:    Sequence[Type], 
+    value:   Any, 
+    decoder: 'TypeDecoder', 
+    path:    List[str], 
+    kwargs: dict
+) -> tuple:
+    """
+    parse tuple value according to annotation
+    
+    :param name:    name of object being parsed
+    :param anno:    tuple annotation
+    :param names:   names of tuple fields
+    :param args:    tuple field annotations
+    :param value:   tuple object value
+    :param decoder: decoder helper implementation
+    :param path:    full path of recursive parsing
+    :param kwargs:  additional kwargs to pass to recursive function
+    :return:        parsed tuple value
+    """
     # raise error if value does not match annotation
     if not is_sequence(value):
-        raise _unexpected(name, anno, value)
+        raise _unexpected(name, anno, value, path)
     # parse values according
     result = []
-    for (name, ianno, item) in zip(names, args, value):
-        item = _parse_object(name, ianno, item, decoder, kwargs)
+    for n, (name, ianno, item) in enumerate(zip(names, args, value), 0):
+        item = _parse_object(name, ianno, item, 
+            decoder, [*path, str(n)], kwargs)
         result.append(item)
     return tuple(result)
 
-def _parse_object(name: str, 
-    anno: Type, value: Any, decoder: 'TypeDecoder', kwargs: dict) -> Any:
-    """recursively parse dataclass annotation"""
+def _parse_object(
+    name:    str, 
+    anno:    Type, 
+    value:   Any, 
+    decoder: 'TypeDecoder', 
+    path:    List[str], 
+    kwargs:  dict
+) -> Any:
+    """
+    recursively parse dataclass annotation
+
+    :param name:    name of object being parsed
+    :param anno:    annotation of object being parsed
+    :param value:   value of object being parsed
+    :param decoder: decoder helper implementation
+    :param path:    full path of recursive parsing
+    :param kwargs:  additional kwargs to pass to recursive function
+    :return:        parsed object value
+    """
     # handle dataclass parsing
     if is_dataclass(anno):
         if is_sequence(value):
-            return from_sequence(anno, value, decoder, **kwargs)
+            return from_sequence(anno, value, decoder, path, **kwargs)
         elif isinstance(value, Mapping):
-            return from_mapping(anno, value, decoder, **kwargs)
+            return from_mapping(anno, value, decoder, path, **kwargs)
     # handle named-tuples
     if anno_is_namedtuple(anno):
         names, args = namedtuple_annos(anno)
-        return _parse_tuple(name, anno, names, args, value, decoder, kwargs)
+        return _parse_tuple(name, anno, names, args, 
+                    value, decoder, path, kwargs)
     # handle defined union tpes
     origin = get_origin(anno)
     if origin is Union:
@@ -197,21 +236,21 @@ def _parse_object(name: str,
             return value
         # attempt to convert it w/ parsing
         for subanno in args:
-            newval = _parse_object(name, subanno, value, decoder, kwargs)
+            newval = _parse_object(name, subanno, value, decoder, path, kwargs)
             if newval != value:
                 return newval
     # handle defined dictionary types
     elif origin in (dict, Mapping):
         # raise error if value does not match annotation
         if not isinstance(value, (dict, Mapping)):
-            raise _unexpected(name, anno, value)
+            raise _unexpected(name, anno, value, path)
         # parse key/value items
         result       = {}
         kname, vname = f'{name}[key]', f'{name}[val]'
         kanno, vanno = get_args(anno)
         for k,v in value.items():
-            k = _parse_object(kname, kanno, k, decoder, kwargs)
-            v = _parse_object(vname, vanno, v, decoder, kwargs)
+            k = _parse_object(kname, kanno, k, decoder, path, kwargs)
+            v = _parse_object(vname, vanno, v, decoder, [*path, k], kwargs)
             result[k] = v
         return type(value)(result) # type: ignore
     # handle defined tuple sequences
@@ -219,18 +258,20 @@ def _parse_object(name: str,
         # raise error if value does not match annotation
         args  = get_args(anno)
         names = [f'{name}[{n}]' for n in range(0, len(args))]
-        return _parse_tuple(name, anno, names, args, value, decoder, kwargs)
+        return _parse_tuple(name, anno, names, args, 
+            value, decoder, path, kwargs)
     # handle defined sequence types
     elif origin in (list, set, Sequence):
         oanno = list if not origin or origin is Sequence else origin
         # raise error if value does not match annotation
         if not is_sequence(value):
-            raise _unexpected(name, anno, value)
+            raise _unexpected(name, anno, value, path)
         # parse sequence items
         ianno  = get_args(anno)[0]
         result = []
         for n, item in enumerate(value, 0):
-            item = _parse_object(f'{name}[{n}]', ianno, item, decoder, kwargs)
+            item = _parse_object(f'{name}[{n}]', ianno, 
+                item, decoder, [*path, str(n)], kwargs)
             result.append(item)
         return oanno(result)
     # allow for custom decoding on arbritrary types
@@ -250,14 +291,20 @@ def _has_skip(field: FieldDef) -> int:
             return 1
     return 2
 
-def from_sequence(cls: Type[T], 
-    values: Union[Sequence, Set], decoder: 'TypeDecoder', **kwargs) -> T:
+def from_sequence(
+    cls:      Type[T], 
+    values:   Union[Sequence, Set], 
+    decoder: 'TypeDecoder', 
+    path:    Optional[List[str]] = None, 
+    **kwargs
+) -> T:
     """
     parse sequence into a valid dataclasss object
 
     :param cls:     validation capable dataclass object
     :param values:  sequence to parse into valid dataclass object
     :param decoder: decoder helper used for deserialization
+    :param path:    Optional[List[str]] = None, 
     :param kwargs:  additional arguments to pass to recursive evaluation
     :return:        parsed dataclass object
     """
@@ -267,9 +314,11 @@ def from_sequence(cls: Type[T],
     if not is_serde(cls):
         validate_serde(cls)
     # check range of parameters
+    path   = path or []
     fields = getattr(cls, FIELD_ATTR)
     if len(values) > len(fields):
-        raise SerdeError(f'{cls.__name__}: sequence contains too many values.')
+        raise SerdeParseError(
+            f'{cls.__name__}: sequence contains too many values.', path)
     # limit number of fields to required components
     if len(values) < len(fields):
         required = [f for f in fields if not has_default(f)]
@@ -282,19 +331,34 @@ def from_sequence(cls: Type[T],
     # iterate values and try to match to annotations
     attrs = {}
     for field, value in zip(fields, values):
-        value = _parse_object(field.name, field.anno, value, decoder, kwargs)
+        value = _parse_object(field.name, field.anno, 
+            value, decoder, [*path, field.name], kwargs)
         if not skip_field(field, value):
             attrs[field.name] = value
-    return cls(**attrs)
+    # convert to object, preserve path in error
+    try:
+        return cls(**attrs)
+    except Exception as e:
+        if isinstance(e, PathError):
+            e.path = [*path, *e.path]
+        raise e
 
-def from_mapping(cls: Type[T], values: Mapping, 
-    decoder: 'TypeDecoder', *, allow_unknown: bool = False, **kwargs) -> T:
+def from_mapping(
+    cls:      Type[T], 
+    values:   Mapping, 
+    decoder: 'TypeDecoder', 
+    path:    Optional[List[str]] = None, 
+    *, 
+    allow_unknown: bool = False, 
+    **kwargs
+) -> T:
     """
     parse mapping into a valid dataclass object
 
     :param cls:           validation capable dataclass object
     :param values:        sequence to parse into valid dataclass object
     :param decoder:       decoder helper used for deserialization
+    :param path:          full path of recursive parsing
     :param allow_unknown: allow for unknown and invalid keys during dict parsing
     :param kwargs:        additional arguments to pass to recursive evaluation
     :return:              parsed dataclass object
@@ -306,6 +370,7 @@ def from_mapping(cls: Type[T], values: Mapping,
         validate_serde(cls)
     # parse key/value into kwargs
     attrs = {}
+    path  = path or []
     fdict = field_dict(cls)
     kwargs.setdefault('allow_unknown', allow_unknown)
     for key, value in values.items():
@@ -313,14 +378,21 @@ def from_mapping(cls: Type[T], values: Mapping,
         if key not in fdict:
             if allow_unknown:
                 continue
-            raise SerdeError(f'Unknown Key: {key!r}')
+            raise SerdeParseError(f'Unknown Key: {key!r}', path)
         # translate value based on annotation
         field = fdict[key]
         name  = field.name
         if skip_field(field, value):
             continue
-        attrs[name] = _parse_object(name, field.anno, value, decoder, kwargs)
-    return cls(**attrs)
+        attrs[name] = _parse_object(name, field.anno, 
+            value, decoder, [*path, key], kwargs)
+    # convert to object, preserve path in error
+    try:
+        return cls(**attrs)
+    except Exception as e:
+        if isinstance(e, PathError):
+            e.path = [*path, *e.path]
+        raise e
 
 def from_object(cls: Type[T], 
     value: Any, decoder: Optional['TypeDecoder'] = None, **kwargs) -> T:
@@ -392,9 +464,21 @@ def to_tuple(cls, encoder: Optional['TypeEncoder'] = None) -> Tuple:
 
 #** Classes **#
 
+@runtime_checkable
+class PathError(Protocol):
+    path: List[str]
+
 class SerdeError(ValueError):
     """Custom ValueError Exception"""
     pass
+
+class SerdeParseError(ValueError, PathError):
+    """Custom Conversion Exception"""
+    path: List[str]
+
+    def __init__(self, message: str, path: List[str]):
+        self.message = message
+        self.path    = path
 
 @dataclass(slots=True)
 class SerdeParams:

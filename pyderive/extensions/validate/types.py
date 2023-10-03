@@ -72,25 +72,25 @@ def is_url(value: str) -> str:
     """check that value is valid url (very naive approach)"""
     url = urlsplit(value)
     if not url.scheme or not url.netloc:
-        raise ValidationError(f'Invalid URL: {value!r}')
+        raise ValueError(f'Invalid URL: {value!r}')
     return value
 
 def is_domain(value: str) -> str:
     """check that value is valid domain"""
     if _re_domain.match(value) is None:
-        raise ValidationError(f'Invalid Domain: {value!r}')
+        raise ValueError(f'Invalid Domain: {value!r}')
     return value
 
 def is_existing_file(value: str):
     """check that the specified file exists"""
     if not os.path.exists(value):
-        raise ValidationError(f'No such file: {value!r}')
+        raise ValueError(f'No such file: {value!r}')
     return value
 
 def is_port(value: int):
     """check that specified value is a port"""
     if value < 0 or value >= (2**16):
-        raise ValidationError(f'Invalid Port: {value!r}')
+        raise ValueError(f'Invalid Port: {value!r}')
     return value
 
 def is_loglevel(value: 'Loglevel') -> int:

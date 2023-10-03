@@ -4,7 +4,7 @@ Custom Validator Helpers for Common Types
 import re
 from typing import Callable, Optional, Sized, TypeVar, Union
 
-from .validators import T, Validator, TypeValidator, ValidationError, chain_validators
+from .validators import T, Validator, TypeValidator, chain_validators
 
 #** Variables **#
 __all__ = [
@@ -28,9 +28,9 @@ def Min(m: Union[int, float]) -> TypeValidator:
     """
     def min(i: I) -> I:
         if not isinstance(i, (int, float, complex)):
-            raise ValidationError(f'Invalid Type for Minimum: {i}')
+            raise ValueError(f'Invalid Type for Minimum: {i}')
         if i <= type(i)(m):
-            raise ValidationError(f'{i!r} below minimum: {m!r}')
+            raise ValueError(f'{i!r} below minimum: {m!r}')
         return i
     return Validator[min]
 
@@ -40,9 +40,9 @@ def Max(m: Union[int, float]) -> TypeValidator:
     """
     def max(i: I) -> I:
         if not isinstance(i, (int, float, complex)):
-            raise ValidationError(f'Invalid Type for Maximum: {i}')
+            raise ValueError(f'Invalid Type for Maximum: {i}')
         if i >= type(i)(m):
-            raise ValidationError(f'{i!r} below maximum: {m!r}')
+            raise ValueError(f'{i!r} below maximum: {m!r}')
         return i
     return Validator[max]
 
@@ -65,9 +65,9 @@ def Length(l: int) -> TypeValidator:
     """
     def length(s: Sized):
         if not isinstance(s, Sized):
-            raise ValidationError(f'Cannot Take Size of {s!r}')
+            raise ValueError(f'Cannot Take Size of {s!r}')
         if len(s) != l:
-            raise ValidationError(f'{s!r} too long: {len(s)} > {l}')
+            raise ValueError(f'{s!r} too long: {len(s)} > {l}')
         return s
     return Validator[length]
 
@@ -84,11 +84,11 @@ def RangeLength(min: Optional[int] = None,
     assert not max or max >= 0, 'maximum must be >= 0'
     def length(s: Sized):
         if not isinstance(s, Sized):
-            raise ValidationError(f'Cannot Take Size of {s!r}')
+            raise ValueError(f'Cannot Take Size of {s!r}')
         if min and len(s) < min:
-            raise ValidationError(f'{s!r} too short: {len(s)} < {min}')
+            raise ValueError(f'{s!r} too short: {len(s)} < {min}')
         if max is not None and len(s) > max:
-            raise ValidationError(f'{s!r} too long: {len(s)} > {min}')
+            raise ValueError(f'{s!r} too long: {len(s)} > {min}')
         return s
     return Validator[length]
 
@@ -102,9 +102,9 @@ def Regex(r: str, **kwargs) -> TypeValidator:
     pattern = re.compile(r, **kwargs)
     def match_regex(s: str):
         if not isinstance(s, str):
-            raise ValidationError(f'Cannot Match Against: {s!r}')
+            raise ValueError(f'Cannot Match Against: {s!r}')
         if not pattern.match(s):
-            raise ValidationError(f'{s!r} Does NOT Match Expected Pattern')
+            raise ValueError(f'{s!r} Does NOT Match Expected Pattern')
         return s
     return Validator[match_regex]
 
@@ -119,7 +119,7 @@ def BoolFunc(f: Callable[[T], bool],
     message = msg or 'Failed to Meet Criteria'
     def boolfunc(t: T) -> T:
         if not f(t):
-            raise ValidationError(message)
+            raise ValueError(message)
         return t
     return boolfunc
 

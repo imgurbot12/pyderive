@@ -1,5 +1,4 @@
-Validation DataClass Extension
--------------------------------
+## Validation DataClass Extension
 
 DataClass Validation Library Inspired by PyDantic.
 
@@ -33,12 +32,12 @@ from typing_extensions import Annotated
 
 def str_validator(value: str) -> str:
     if value == 'example':
-        raise ValidationError('Cannot use Example!')
+        raise ValueError('Cannot use Example!')
     return value
 
 def custom_validator(value: 'CustomType') -> 'CustomType':
     if not isinstance(value.a, str):
-        raise ValidationError('CustomType.a must be a string!')
+        raise ValueError('CustomType.a must be a string!')
     return value
 
 class CustomType:
