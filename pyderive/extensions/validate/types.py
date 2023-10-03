@@ -6,8 +6,8 @@ import os
 import re
 import logging
 from ipaddress import *
-from typing import Union
-from typing_extensions import Annotated
+from typing import Any, AnyStr, IO, BinaryIO, Protocol, TextIO, Union
+from typing_extensions import Annotated, runtime_checkable
 from urllib.parse import urlsplit
 
 from .helpers import Regex
@@ -33,6 +33,9 @@ __all__ = [
     'Datetime',
     'Timedelta',
 ]
+
+#: functions needed for IO impl
+IO_FUNCS = [var for var, value in vars(IO).items() if callable(value)]
 
 _re_domain = re.compile(r'^(?:[a-zA-Z0-9_](?:[a-zA-Z0-9-_]{0,61}' + \
   r'[A-Za-z0-9])?\.)+[A-Za-z0-9][A-Za-z0-9-_]{0,61}[A-Za-z]\.?$')
@@ -141,6 +144,26 @@ def is_timedelta(value: 'Timedelta') -> timedelta:
         kwargs[field] = int(count)
     return timedelta(**kwargs)
 
+def is_io(value: Any) -> Any:
+    """check if value is valid io object"""
+    if all(callable(getattr(value, f, None)) for f in IO_FUNCS):
+        return value
+    raise ValueError(f'Not Valid IO: {value!r}')
+
+def is_textio(value: Any) -> Any:
+    """check if value is textio"""
+    if hasattr(value, 'encoding'):
+        return is_io(value)
+    raise ValueError(f'Not TextIO: {value!r}')
+
+def is_binaryio(value: Any) -> Any:
+    """check if value is bytesio"""
+    if not hasattr(value, 'encoding'):
+        return is_io(value)
+    raise ValueError(f'Not BinaryIO: {value!r}')
+
+#** Classes **#
+
 #** Init **#
 
 #: convert string directly into bytes using default encoding
@@ -176,3 +199,6 @@ Timedelta = Annotated[Union[str, int, timedelta], Validator[is_timedelta]]
 # register additional validators for common python types
 register_validator(datetime, is_datetime)
 register_validator(timedelta, is_timedelta)
+register_validator(IO, is_io)
+register_validator(TextIO, is_textio)
+register_validator(BinaryIO, is_binaryio)
