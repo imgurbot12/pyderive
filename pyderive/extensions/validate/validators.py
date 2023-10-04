@@ -10,9 +10,11 @@ from typing import *
 from typing_extensions import Annotated, runtime_checkable, get_origin, get_args
 
 from ..serde import is_sequence
-from ...abc import FieldDef, FieldValidator
+from ...abc import MISSING, FieldDef, FieldValidator
 from ...compat import is_stddataclass
 from ...dataclasses import is_dataclass, asdict
+
+#TODO: implement better string format for error objects
 
 #** Variables **#
 __all__ = [
@@ -77,12 +79,18 @@ def is_autogen(f: Callable) -> bool:
     """
     return hasattr(f, VALIDATOR_MARKER)
 
+def check_missing(anno: Union[Type, List[Type]], value: Any):
+    """check that the specified value is not MISSING"""
+    if value is MISSING:
+        anno = tuple(anno) if is_sequence(anno) else (anno, )
+        raise ValidationError(anno, None, 'missing', 'Field required')
+
 def none_validator(value: Any):
     """
     validate value is a none-type
     """
     if value is not None:
-        raise ValidationError((None, ), value, 'Value is not Null')
+        raise ValidationError((None, ), value, 'not_null', 'Value is not Null')
 
 def simple_validator(cast: Type[T], typecast: bool) -> TypeValidator[T]:
     """
@@ -95,6 +103,7 @@ def simple_validator(cast: Type[T], typecast: bool) -> TypeValidator[T]:
     name = _anno_name(cast)
     @_wrap(name)
     def validator(value: Any) -> Any:
+        check_missing(cast, value)
         if isinstance(value, cast):
             return value
         if typecast:
@@ -103,7 +112,8 @@ def simple_validator(cast: Type[T], typecast: bool) -> TypeValidator[T]:
                 return cast(value)
             except (ValueError, ValidationError):
                 pass
-        raise ValidationError((cast, ), value, f'Invalid {name}')
+        raise ValidationError((cast, ), value, 
+            f'parse_{name}', f'Invalid {name}')
     return validator
 
 def seq_validator(outer: Type, base: Type, iv: TypeValidator, typecast: bool) -> TypeValidator:
@@ -119,9 +129,11 @@ def seq_validator(outer: Type, base: Type, iv: TypeValidator, typecast: bool) ->
     name = _anno_name(outer)
     @_wrap(name)
     def validator(value: Sequence[Any]):
+        check_missing(outer, value)
         if (base and not typecast and not isinstance(value, base)) \
             or not is_sequence(value):
-            raise ValidationError((outer, ), value, 'Invalid Sequence')
+            raise ValidationError((outer, ), 
+                value, 'parse_sequence', 'Invalid Sequence')
         values = []
         for n, item in enumerate(value, 0):
             try:
@@ -149,8 +161,10 @@ def map_validator(outer: Type,
     name = _anno_name(outer)
     @_wrap(name)
     def validator(value: Mapping[Any, Any]):
+        check_missing(outer, value)
         if not isinstance(value, Mapping):
-            raise ValidationError((outer, ), value, 'Invalid Mapping')
+            raise ValidationError((outer, ), value, 
+                'parse_map', 'Invalid Mapping')
         values = {}
         for k,v in value.items():
             try:
@@ -181,17 +195,21 @@ def tup_validator(anno: Type, validators: List[TypeValidator],
     name = _anno_name(anno)
     @_wrap(name)
     def validator(value: Any):
+        check_missing(anno, value)
         # convert to tuple or raise error
         if not isinstance(value, tuple):
             if not typecast:
-                raise ValidationError((anno, ), value, 'Invalid tuple')
+                raise ValidationError((anno, ), 
+                    value, 'parse_tuple', 'Invalid tuple')
             value = tuple(value)
         # ensure number of min-values matches
         if len(value) < len(validators):
-            raise ValidationError((anno, ), value, 'Not enough items')
+            raise ValidationError((anno, ),
+                value, 'parse_tuple', 'Not enough items')
         # ensure number of max-values on no elipsis
         if not ellipsis and len(value) > len(validators):
-            raise ValidationError((anno, ), value, 'Too many items')
+            raise ValidationError((anno, ), 
+                value, 'parse_tuple', 'Too many items')
         # iterate and validate items in tuple
         values = []
         for n, (item, validator) in enumerate(zip(value, validators), 0):
@@ -224,6 +242,7 @@ def enum_validator(anno: Type[Enum], typecast: bool) -> TypeValidator:
     """
     @_wrap(anno.__name__)
     def validator(value: Any):
+        check_missing(anno, value)
         if isinstance(value, anno):
             return value
         if typecast:
@@ -235,7 +254,7 @@ def enum_validator(anno: Type[Enum], typecast: bool) -> TypeValidator:
                 return anno(value)
             except (ValueError, ValidationError):
                 pass
-        raise ValidationError((anno, ), value, 'Invalid Enum')
+        raise ValidationError((anno, ), value, 'parse_enum', 'Invalid Enum')
     return validator
 
 def subclass_validator(anno: Type) -> TypeValidator:
@@ -252,12 +271,13 @@ def subclass_validator(anno: Type) -> TypeValidator:
     # generate validator
     @_wrap(_anno_name(anno))
     def validator(value: Any):
+        check_missing(anno, value)
         if is_protocol:
             if isinstance(value, type) and anno in value.__mro__:
                 return value
         elif isinstance(value, type) and issubclass(value, anno):
             return value
-        raise ValidationError((anno, ), value, 'Invalid Subclass')
+        raise ValidationError((anno, ), value, 'parse_type', 'Invalid Subclass')
     return validator
 
 def union_validator(anno: Type, 
@@ -289,6 +309,7 @@ def union_validator(anno: Type,
     # generate valdiator object
     @_wrap(_anno_name(anno))
     def validator(value: Any):
+        check_missing(annotations, value)
         if isinstance(value, annotations):
             return value
         for validator in validators:
@@ -296,7 +317,8 @@ def union_validator(anno: Type,
                 return validator(value)
             except ValueError:
                 pass
-        raise ValidationError(annotations, value, 'Unable to Match Union')
+        raise ValidationError(annotations, 
+            value, 'parse_union', 'Unable to Match Union')
     return validator
 
 def dclass_validator(anno: Type, typecast: bool) -> TypeValidator:
@@ -309,6 +331,7 @@ def dclass_validator(anno: Type, typecast: bool) -> TypeValidator:
     name = _anno_name(anno)
     @_wrap(name)
     def validator(value: Any):
+        check_missing(anno, value)
         force_typecast = False
         original_value = value
         if isinstance(value, anno):
@@ -331,8 +354,8 @@ def dclass_validator(anno: Type, typecast: bool) -> TypeValidator:
                 return anno(value)
             except (TypeError, ValueError):
                 pass
-        raise ValidationError(
-            (anno, ), original_value, 'Unable to Convert to Dataclass')
+        raise ValidationError((anno, ), original_value, 
+            f'parse_object', 'Unable to Convert to Dataclass')
     return validator
 
 def chain_validators(validators: List[TypeValidator]) -> TypeValidator:
@@ -466,9 +489,11 @@ def convert_error(inst: Any, field: FieldDef, value: Any, err: 'ValidationError'
     name    = obj.__name__
     anno    = '/'.join(_anno_name(a) for a in err.anno)
     vtype   = _anno_name(type(value))
-    message = f'Input should be a valid {anno}' + \
-        f', unable to parse {vtype}. {err.message}'
-    new_err = FieldValidationError(name, field, err.value, message)
+    message = err.message
+    if err.etype != 'missing':
+        message = f'Input should be a valid {anno}' + \
+            f', unable to parse {vtype}. {err.message}'
+    new_err = FieldValidationError(name, field, err.value, err.etype, message)
     if err.path is not None:
         new_err.path.extend(err.path)
     return new_err
@@ -493,9 +518,11 @@ def field_validator(cls: Type,
         except ValidationError as e:
             raise convert_error(self, field, value, e) from None 
         except ValueError as e:
+            err  = str(e)
             obj  = self if isinstance(self, type) else type(self)
             name = obj.__name__
-            raise FieldValidationError(name, field, value, str(e)) from None
+            etype = f'parse_{_anno_name(field.anno)}'
+            raise FieldValidationError(name, field, value, etype, err) from None
     field_validator.__name__ = f'validate_{field.name}'
     field_validator.__qualname__ = field_validator.__name__
     field_validator.__autogen__ = True
@@ -518,10 +545,12 @@ class ValidationError(ValueError):
     """Exception Raised during Validation Error"""
     anno:    Tuple[Type, ...]
     value:   Any
+    etype:   str
     message: str
     path:    List[str]
 
-    def __init__(self, anno, value, message, path = None):
+    def __init__(self, anno, value, etype, message, path = None):
+        self.etype   = etype
         self.anno    = anno
         self.value   = value
         self.message = message
@@ -529,9 +558,14 @@ class ValidationError(ValueError):
 
 class FieldValidationError(ValueError):
     """Exception Raised When Field Validation Fails"""
-    title: str
+    etype:   str
+    title:   str
+    field:   FieldDef
+    value:   Any
+    message: str
 
-    def __init__(self, title: str, field: FieldDef, value: Any, message: str):
+    def __init__(self, title, field, value, etype, message):
+        self.etype       = etype
         self.title       = title
         self.field       = field
         self.path        = [self.field.name]
@@ -542,8 +576,8 @@ class FieldValidationError(ValueError):
     def errors(self) -> List[dict]:
         """generate errors dictionary object"""
         return [{
-            'type':  _anno_name(self.field.anno),
-            'loc':   tuple(self.path),
+            'type':  self.etype,
+            'path':  tuple(self.path),
             'msg':   self.message,
             'input': self.value,
         }]

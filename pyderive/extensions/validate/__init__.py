@@ -11,7 +11,7 @@ from .helpers import *
 from .validators import *
 
 from ..serde import from_object, is_sequence
-from ...abc import TypeT, DataFunc
+from ...abc import TypeT, DataFunc, has_default
 from ...compile import assign_func, create_init, gen_slots
 from ...dataclasses import POST_INIT, PARAMS_ATTR, FIELD_ATTR
 from ...dataclasses import *
@@ -112,6 +112,9 @@ def validate(cls = None, *,
         fields = getattr(cls, FIELD_ATTR)
         params = getattr(cls, PARAMS_ATTR)
         for f in fields:
+            # set empty default values to MISSING for validation errors
+            if not has_default(f):
+                f.default_factory = lambda: MISSING
             # update validators if params have changed or were never assigned
             if different and f.validator and is_autogen(f.validator):
                 f.validator = None
