@@ -10,7 +10,7 @@ from .generic import *
 from .helpers import *
 from .validators import *
 
-from ..serde import from_object, is_sequence
+from ..serde import from_object
 from ...abc import TypeT, DataFunc, has_default
 from ...compile import assign_func, create_init, gen_slots
 from ...dataclasses import POST_INIT, PARAMS_ATTR, FIELD_ATTR
@@ -56,7 +56,7 @@ __all__ = [
     'PreValidator',
     'PostValidator',
     'ValidationError',
-    'FieldValiationError',
+    'FieldValidationError',
 ]
 
 #: attribute to store dataclass validation information
