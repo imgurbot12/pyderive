@@ -1,7 +1,7 @@
 """
 PyDerive Validation Extension UnitTests
 """
-from typing import Any, Dict, List, NamedTuple, Tuple, Type, Union
+from typing import Any, Dict, List, NamedTuple, Tuple, Union
 from unittest import TestCase
 
 from ...extensions.serde import *
@@ -13,13 +13,13 @@ __all__ = ['SerdeTests']
 
 class SerdeTests(TestCase):
     """Serde Serialization UnitTests"""
-    
-    def assertDict(self, s: Type, v: Dict):
+
+    def assertDict(self, s: Any, v: Dict):
         """assert serialization/deserialization for dict works as intended"""
         self.assertEqual(to_dict(s), v)
         self.assertEqual(from_object(s.__class__, v), s)
 
-    def assertTuple(self, s: Type, v: Tuple):
+    def assertTuple(self, s: Any, v: Tuple):
         """assert serialization/deserialization for tuple works as intended"""
         self.assertEqual(to_tuple(s), v)
         self.assertEqual(from_object(s.__class__, v), s)
@@ -54,8 +54,8 @@ class SerdeTests(TestCase):
         self.assertSerial(foo, 'json', '{"a": 1, "b": "text"}')
         self.assertSerial(foo, 'yaml', 'a: 1\nb: text\n')
         self.assertSerial(foo, 'toml', 'a = 1\nb = "text"\n')
-        self.assertSerial(foo, 'xml', "<?xml version='1.0' encoding='utf-8'?>\n<Foo><a>1</a><b>text</b></Foo>")
-    
+        self.assertSerial(foo, 'xml', "<Foo><a>1</a><b>text</b></Foo>")
+
     def test_serialize_complex(self):
         """ensure more complex serialization functions work as intended"""
         class Bar(Serde):

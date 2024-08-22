@@ -6,6 +6,7 @@ from types import FunctionType
 from typing import Iterator, Tuple, Type, List, Optional, Any, Callable, Dict
 
 from .abc import *
+from .abc import ReprHide
 
 #** Variables **#
 __all__ = [
@@ -38,9 +39,9 @@ HDF_VAR = f'_{HDF.__name__}'
 #** Functions **#
 
 def _create_fn(
-    name:        str, 
-    args:        List[str], 
-    body:        List[str], 
+    name:        str,
+    args:        List[str],
+    body:        List[str],
     locals:      Optional[dict] = None,
     globals:     Optional[dict] = None,
     return_type: Any            = MISSING
@@ -98,7 +99,7 @@ def _init_assign(self_name: str, name: str, value: str, frozen: bool) -> str:
         return f'object.__setattr__({self_name}, {name!r}, {value})'
     return f'{self_name}.{name}={value}'
 
-def _init_validator(self_name: str, 
+def _init_validator(self_name: str,
     field: FieldDef, value: str, globals: dict) -> Tuple[List[str], str]:
     """generate field validator function call"""
     field_name = f'_field_{field.name}'
@@ -115,7 +116,7 @@ def _init_validator(self_name: str,
 
 def create_init(
     fields:    Fields,
-    kw_only:   bool = False, 
+    kw_only:   bool = False,
     post_init: bool = False,
     frozen:    bool = False,
 ) -> Callable:
@@ -123,7 +124,7 @@ def create_init(
     generate dynamic init-function from the following args/kwargs
 
     :param fields:    ordered field used to generate init-args/func-body
-    :param kw_only:   override kw-only to make everything kw-only 
+    :param kw_only:   override kw-only to make everything kw-only
     :param post_init: enable post-init when true
     :return:          generated init-function made from specifications
     """
@@ -134,7 +135,7 @@ def create_init(
     for field in fields:
         # handle non-init edge cases
         name = field.name
-        if not field.init and not has_default(field): 
+        if not field.init and not has_default(field):
             # raise an error if field is an init-var
             if field.field_type == FieldType.INIT_VAR:
                 raise TypeError(f'field {name!r} must have init as InitVar')
@@ -181,16 +182,30 @@ def _stdfields(fields: Fields) -> Iterator[FieldDef]:
     """retrieve only standard fields from fields-list"""
     return (f for f in fields if f.field_type == FieldType.STANDARD)
 
-def create_repr(fields: Fields) -> Callable:
+def _repr_value(field: FieldDef, hide: Optional[ReprHide] = None) -> str:
+    """generate repr field entry based on hide/field settings"""
+    hide = field.metadata.get('hide') or hide
+    name = field.name
+    attr = f'self.{name}'
+    if hide == 'null':
+        return f'(("{name}=" + repr({attr})) if {attr} is not None else "")'
+    elif hide == 'empty':
+        return f'(("{name}=" + repr({attr})) if {attr} else "")'
+    return f'"{name}=" + repr({attr})'
+
+def create_repr(fields: Fields, hide: Optional[ReprHide] = None) -> Callable:
     """
     generate simple repr-function for the following field-structure
 
     :param fields: ordered field used to generate repr-func
+    :param hide:   optional hide setting for repr
     :param return: repr-function
     """
-    names = [f.name for f in _stdfields(fields) if f.repr]
-    body  = 'return self.__class__.__qualname__ + f"(' + \
-        ', '.join(f'{name}={{self.{name}!r}}' for name in names) + ')"'
+    body = 'return self.__class__.__qualname__ + "("'
+    if fields:
+        body += '\\\n + '
+        body += '\\\n + "," + '.join(_repr_value(f, hide) for f in _stdfields(fields))
+    body += ' + ")"'
     func = _create_fn('__repr__', ['self'], [body])
     return recursive_repr('...')(func)
 
@@ -211,8 +226,8 @@ def create_compare(fields: Fields, func: str, op: str) -> Callable:
     :return:       compare-function
     """
     names  = [f.name for f in _stdfields(fields) if f.compare]
-    self_t  = _tuple_str(names, 'self') 
-    other_t = _tuple_str(names, 'other')  
+    self_t  = _tuple_str(names, 'self')
+    other_t = _tuple_str(names, 'other')
     return _create_fn(func, ['self', 'other'], [
          'if other.__class__ is self.__class__:',
         f' return {self_t} {op} {other_t}',
@@ -226,7 +241,7 @@ def create_hash(fields: Fields) -> Callable:
     :param fields: ordered fields used to generate hash-function
     :return:       hash-function
     """
-    names   = [f.name for f in _stdfields(fields) 
+    names   = [f.name for f in _stdfields(fields)
         if (f.compare if f.hash is None else f.hash)]
     names_t = _tuple_str(names, 'self')
     return _create_fn('__hash__', ['self'], [f'return hash({names_t})'])
@@ -242,7 +257,7 @@ def create_iter(fields: Fields) -> Callable:
     names_t = _tuple_str(names, 'self')
     return _create_fn('__iter__', ['self'], [f'return iter({names_t})'])
 
-def assign_func(cls: Type, func: Callable, 
+def assign_func(cls: Type, func: Callable,
     name: Optional[str] = None, overwrite: bool = False) -> bool:
     """
     assign function to the object and modify qualname
@@ -311,7 +326,7 @@ def add_slots(cls: Type, fields: Fields, frozen: bool = False) -> Type:
         cls.__qualname__ = qname
     # implement custom state functions when frozen to enable proper pickling
     if frozen or any(f.frozen for f in fields):
-        names_t  = _tuple_str([repr(name) for name in slots]) 
+        names_t  = _tuple_str([repr(name) for name in slots])
         values_t = _tuple_str(slots, 'self')
         getstate = _create_fn('__getstate__', ['self'], [f'return {values_t}'])
         setstate = _create_fn('__setstate__', ['self', 'state'], [

@@ -44,7 +44,7 @@ TypeT = TypeVar('TypeT', bound=Type)
 InitVar = Annotated[T, 'INIT-VAR']
 
 #: typehint for dataclass creator function
-DataFunc = Callable[[TypeT], TypeT] 
+DataFunc = Callable[[TypeT], TypeT]
 
 #: type definition for a list of fields
 Fields = List['FieldDef']
@@ -60,6 +60,9 @@ FieldValidator = Callable[[Any, F, Any], Any]
 
 #: optional field validator function
 OptValidator = Optional[FieldValidator]
+
+#: optional settings for when to hide values in repr
+ReprHide = Union[Literal['null'], Literal['empty']]
 
 #** Functions **#
 
@@ -101,7 +104,7 @@ class FieldDef(Protocol):
     validator:       OptValidator   = None
     metadata:        Dict[str, Any] = {}
     field_type:      FieldType      = FieldType.STANDARD
- 
+
     @abstractmethod
     def __init__(self, name: str, anno: Type, default: Any = MISSING):
         raise NotImplementedError
@@ -144,7 +147,7 @@ class Field(FieldDef):
         self.field_type      = field_type
 
 class FlatStruct:
- 
+
     def __init__(self,
         order:  Optional[List[str]]           = None,
         fields: Optional[Dict[str, FieldDef]] = None,

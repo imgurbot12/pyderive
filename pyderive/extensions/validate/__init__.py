@@ -34,14 +34,14 @@ __all__ = [
     'Loglevel',
     'Datetime',
     'Timedelta',
- 
-    'Min', 
-    'Max', 
-    'Range', 
-    'RangeLength', 
-    'Length', 
-    'Regex', 
-    'BoolFunc', 
+
+    'Min',
+    'Max',
+    'Range',
+    'RangeLength',
+    'Length',
+    'Regex',
+    'BoolFunc',
     'IsAlNum',
 
     'has_validation',
@@ -82,7 +82,7 @@ def validate(cls: TypeT, **kwargs) -> TypeT:
     ...
 
 @dataclass_transform()
-def validate(cls = None, *, 
+def validate(cls = None, *,
     recurse: bool = False, typecast: bool = False, **kwargs):
     """
     validation decorator to use on top of an existing dataclass
@@ -146,7 +146,7 @@ class BaseModel:
     PyDantic Inspirted Validation Model MetaClass
     """
 
-    def __init_subclass__(cls, recurse: bool = False, 
+    def __init_subclass__(cls, recurse: bool = False,
         typecast: bool = False, slots: bool = True, **kwargs):
         """
         :param recurse:  allow recusive validation of dataclasses
@@ -164,7 +164,7 @@ class BaseModel:
         validate(cls, recurse=recurse, typecast=typecast)
         if slots:
             setattr(cls, '__slots__', gen_slots(cls, fields(cls)))
- 
+
     def validate(self):
         """run ad-hoc validation against current model values"""
         for field in fields(self):

@@ -1,7 +1,7 @@
 """
 Rust Serde Inspired Serialization Decorators
 """
-from typing import Any, Callable, Dict, Optional, Tuple, Type, Union, overload
+from typing import Any, Callable, Dict, Optional, Tuple, Type, TypeVar, Union, overload
 from typing_extensions import Self, dataclass_transform
 from warnings import warn
 
@@ -12,9 +12,9 @@ from ...dataclasses import is_dataclass, dataclass, fields
 
 #** Variables **#
 __all__ = [
-    'serde', 
-    'field', 
-    'serialize', 
+    'serde',
+    'field',
+    'serialize',
     'deserialize',
     'register_serial',
     'register_deserial',
@@ -48,18 +48,20 @@ DESERIALIZER_IMPL: Dict[str, Deserializer] = {
     'xml':  XmlDeserial,
 }
 
+C = TypeVar('C', bound=Type)
+
 #** Functions **#
 
 @overload
-def serde(cls: None = None, **kwargs) -> Callable[[T], T]:
+def serde(cls: None = None, **kwargs) -> Callable[[C], C]:
     ...
 
 @overload
-def serde(cls: T, **kwargs) -> T:
+def serde(cls: C, **kwargs) -> C:
     ...
 
 @dataclass_transform()
-def serde(cls: Optional[T] = None, **kwargs) -> Union[T, Callable[[T], T]]:
+def serde(cls: Optional[C] = None, **kwargs) -> Union[C, Callable[[C], C]]:
     """
     make dataclass and validate serde settings
 
@@ -67,7 +69,7 @@ def serde(cls: Optional[T] = None, **kwargs) -> Union[T, Callable[[T], T]]:
     :param kwargs: additional settings to pass during dataclass generation
     :return:       dataclass/serde-supported object
     """
-    def wrapper(cls: T) -> T:
+    def wrapper(cls):
         # transform into a dataclass if not already
         if not is_dataclass(cls):
             kwargs.setdefault('slots', True)
@@ -87,16 +89,16 @@ def field(**kwargs) -> Any:
     return SerdeField(**kwargs)
 
 @overload
-def serialize(cls, 
+def serialize(cls,
     format: None = None, *, serial: Serializer[T], **kwargs) -> T:
     ...
 
 @overload
-def serialize(cls, 
+def serialize(cls,
     format: str, serial: None = None, **kwargs) -> Union[str, bytes]:
     ...
 
-def serialize(cls, format: Optional[str] = None, 
+def serialize(cls, format: Optional[str] = None,
     serial: Optional[Serializer[T]] = None, **kwargs) -> Union[T, str, bytes]:
     """
     encode the specified dataclass w/ the given format or serializer
@@ -113,19 +115,19 @@ def serialize(cls, format: Optional[str] = None,
     return serial.serialize(cls, **kwargs)
 
 @overload
-def deserialize(cls: Type[T], 
+def deserialize(cls: Type[T],
     raw: D, format: None = None, *, deserial: Deserializer[D], **kwargs) -> T:
     ...
 
 @overload
-def deserialize(cls: Type[T], 
+def deserialize(cls: Type[T],
     raw: Union[str, bytes], format: str, deserial: None = None, **kwargs) -> T:
     ...
 
-def deserialize(cls: Type[T], 
-    raw:      Union[S, str, bytes], 
+def deserialize(cls: Type[T],
+    raw:      Union[S, str, bytes],
     format:   Optional[str] = None,
-    deserial: Optional[Deserializer[S]] = None, 
+    deserial: Optional[Deserializer[S]] = None,
     **kwargs
 ) -> T:
     """
@@ -206,7 +208,7 @@ class Serialize:
         :return: tuple of orignal object
         """
         return to_tuple(self, **kwargs)
- 
+
     def serialize(self, *args, **kwargs):
         """
         serialize self w/ the following arguments
@@ -289,7 +291,7 @@ class Deserialize:
         :return: decoded dataclass object
         """
         return cls.deserialize(json, 'json', **kwargs)
- 
+
     @classmethod
     def from_yaml(cls, yaml: Union[str, bytes], **kwargs) -> Self:
         """
@@ -298,7 +300,7 @@ class Deserialize:
         :return: decoded dataclass object
         """
         return cls.deserialize(yaml, 'yaml', **kwargs)
- 
+
     @classmethod
     def from_toml(cls, toml: Union[str, bytes], **kwargs) -> Self:
         """
@@ -312,7 +314,7 @@ class Deserialize:
     def from_xml(cls, toml: Union[str, bytes], **kwargs) -> Self:
         """
         deserialize self from xml string
-        
+
         :return: decoded dataclass object
         """
         return cls.deserialize(toml, 'xml', **kwargs)
@@ -320,6 +322,6 @@ class Deserialize:
 @dataclass_transform()
 class Serde(Serialize, Deserialize):
     """Implement Both Serialize/Deserialize Methods on Class Instance"""
- 
+
     def __init_subclass__(cls, **kwargs):
         _init_subclass(cls, **kwargs)

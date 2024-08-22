@@ -35,7 +35,7 @@ def remove_field(fields: ClassStruct, name: str):
 def parse_fields(
     cls:     Type,
     factory: Type[FieldDef] = Field,
-    recurse: bool           = True, 
+    recurse: bool           = True,
     delete:  bool           = True,
     strict:  bool           = True,
 ) -> ClassStruct:
@@ -102,7 +102,7 @@ def parse_fields(
             inner_anno = get_initvar(anno)
             if inner_anno:
                 field.anno = inner_anno
-                field.field_type = FieldType.INIT_VAR 
+                field.field_type = FieldType.INIT_VAR
             # finalize field build and assign to struct
             field.__compile__(cls)
             fields.fields[name] = field

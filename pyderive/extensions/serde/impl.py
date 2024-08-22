@@ -9,7 +9,7 @@ from .serde import *
 
 #** Variables **#
 __all__ = [
-    'JsonSerial', 
+    'JsonSerial',
     'YamlSerial',
     'TomlSerial',
     'XmlSerial',
@@ -59,7 +59,7 @@ class JsonDeserial(Deserializer[str]):
 
 class YamlSerial(Serializer[str]):
     """"""
-    
+
     @classmethod
     def serialize_tuple(cls, dumper, tup):
         """serialize named-tuples properly"""

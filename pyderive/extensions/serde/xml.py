@@ -65,11 +65,11 @@ def _is_namedtuple(value: Any) -> bool:
     return isinstance(value, tuple) and hasattr(value, '_fields')
 
 def _asxml_inner(
-    root:     'Element', 
-    name:     str, 
-    obj:      Any, 
-    rec:      int, 
-    lvl:      int, 
+    root:     'Element',
+    name:     str,
+    obj:      Any,
+    rec:      int,
+    lvl:      int,
     attrs:    bool,
     use_type: bool,
 ):
@@ -125,7 +125,7 @@ def _asxml_inner(
         elem.attrib.update({'type': type(obj).__name__} if use_type else {})
         root.append(elem)
 
-def from_xml(cls: Type[T], 
+def from_xml(cls: Type[T],
     root: 'Element', allow_unused: bool = False, use_attrs: bool = False) -> T:
     """
     parse the specified xml element-tree into a valid dataclass object
@@ -267,7 +267,7 @@ class Element(Protocol):
     @abstractmethod
     def __len__(self) -> int:
         raise NotImplementedError
-   
+
     @abstractmethod
     def __iter__(self) -> Iterator['Element']:
         raise NotImplementedError

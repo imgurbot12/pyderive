@@ -6,8 +6,8 @@ import os
 import re
 import logging
 from ipaddress import *
-from typing import Any, AnyStr, IO, BinaryIO, Protocol, TextIO, Union
-from typing_extensions import Annotated, runtime_checkable
+from typing import Any, IO, BinaryIO, TextIO, Union
+from typing_extensions import Annotated
 from urllib.parse import urlsplit
 
 from .helpers import Regex
@@ -56,13 +56,13 @@ Email = Annotated[str, Regex(_re_email)]
 
 #** Function **#
 
-def is_bytes(value: Union[str, bytes]):
+def is_bytes(value: Union[str, bytes]) -> bytes:
     """check that the given value is bytes and convert string"""
     if isinstance(value, str):
         return value.encode()
     return value
 
-def is_hexbytes(value: Union[str, bytes]):
+def is_hexbytes(value: Union[str, bytes]) -> bytes:
     """check that value is bytes and convert hexstrings"""
     if isinstance(value, str):
         return bytes.fromhex(value)
@@ -81,13 +81,13 @@ def is_domain(value: str) -> str:
         raise ValueError(f'Invalid Domain: {value!r}')
     return value
 
-def is_existing_file(value: str):
+def is_existing_file(value: str) -> str:
     """check that the specified file exists"""
     if not os.path.exists(value):
         raise ValueError(f'No such file: {value!r}')
     return value
 
-def is_port(value: int):
+def is_port(value: int) -> int:
     """check that specified value is a port"""
     if value < 0 or value >= (2**16):
         raise ValueError(f'Invalid Port: {value!r}')
@@ -126,7 +126,7 @@ def is_timedelta(value: 'Timedelta') -> timedelta:
     if not isinstance(value, str):
         raise ValueError(value)
     # attempt to complete regex match
-    value = value.strip() 
+    value = value.strip()
     if _re_timedelta.match(value) is None:
         raise ValueError(value)
     # separate digit from field name and match to existing fields

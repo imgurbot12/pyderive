@@ -3,26 +3,27 @@ DataClass stdlib recreation using existing helpers
 """
 import abc
 import copy
-from typing import * 
+from typing import *
 from typing_extensions import dataclass_transform, runtime_checkable
 
 from .abc import *
+from .abc import ReprHide
 from .parse import *
 from .compile import *
 from .compat import is_stddataclass, convert_params, std_assign_fields
 
 #** Variables **#
 __all__ = [
-    'InitVar', 
-    'MISSING', 
+    'InitVar',
+    'MISSING',
     'DataClassLike',
     'FrozenInstanceError',
-    
+
     'TupleFactory',
     'DictFactory',
 
     'is_dataclass',
-    'field', 
+    'field',
     'fields',
     'astuple',
     'asdict',
@@ -30,7 +31,7 @@ __all__ = [
 ]
 
 #: asdict/astuple custom encoder function
-EncoderFunc = Callable[[Any], Any] 
+EncoderFunc = Callable[[Any], Any]
 
 #: optional asdict/astuple encoder function
 OptEncoderFunc = Optional[EncoderFunc]
@@ -114,7 +115,7 @@ def fields(cls, all_types: bool = False):
         fields = [f for f in fields if f.field_type == FieldType.STANDARD]
     return fields
 
-def _astuple_inner(obj, rec: int, 
+def _astuple_inner(obj, rec: int,
     encoder: OptEncoderFunc, factory: TupleFactory, lvl: int) -> Any:
     """inner tuple-ify function to convert dataclass fields to tuple"""
     # stop recursin after limit
@@ -147,15 +148,16 @@ def _astuple_inner(obj, rec: int,
         value = copy.deepcopy(obj)
         return value if encoder is None else encoder(value)
 
-def astuple(cls, *, 
-    recurse:       int            = 0, 
-    encoder:       OptEncoderFunc = None, 
+def astuple(cls, *,
+    recurse:       int            = 0,
+    encoder:       OptEncoderFunc = None,
     tuple_factory: TupleFactory   = tuple
 ) -> tuple:
     """
     convert dataclass object into dictionary of field-values
 
     :param cls:           dataclass object class instance
+    :param recurse:       recursion limit (if > 0)
     :param encoder:       python object encoder function
     :param tuple_factory: factory used to generate tuple
     :return:              field instances as dict
@@ -164,7 +166,7 @@ def astuple(cls, *,
         raise TypeError('astuple() should be called on dataclass instances')
     return _astuple_inner(cls, recurse, encoder, tuple_factory, 0)
 
-def _asdict_inner(obj, rec: int, 
+def _asdict_inner(obj, rec: int,
     encoder: OptEncoderFunc, factory: DictFactory, lvl: int) -> Any:
     """inner dictionary-ify function to convert dataclass fields into dict"""
     # stop recursin after limit
@@ -197,15 +199,16 @@ def _asdict_inner(obj, rec: int,
         value = copy.deepcopy(obj)
         return value if encoder is None else encoder(value)
 
-def asdict(cls, *, 
-    recurse:      int            = 0, 
-    encoder:      OptEncoderFunc = None, 
+def asdict(cls, *,
+    recurse:      int            = 0,
+    encoder:      OptEncoderFunc = None,
     dict_factory: DictFactory    = dict
 ) -> dict:
     """
     convert dataclass object into dictionary of field-values
 
     :param cls:          dataclass object class instance
+    :param recurse:      recursion limit (if > 0)
     :param encoder:      python object encoder function
     :param dict_factory: factory used to generate tuple
     :return:             field instances as dict
@@ -217,9 +220,10 @@ def asdict(cls, *,
 @dataclass_transform(field_specifiers=(FieldDef, Field, field))
 def _process_class(
     cls: TypeT,
-    init:        Optional[bool] = None,
-    repr:        Optional[bool] = None,
-    iter:        Optional[bool] = None,
+    init:        Optional[bool]     = None,
+    repr:        Optional[bool]     = None,
+    iter:        Optional[bool]     = None,
+    hide_repr:   Optional[ReprHide] = None,
     eq:          bool = True,
     order:       bool = False,
     unsafe_hash: bool = False,
@@ -249,7 +253,7 @@ def _process_class(
         for f in fields:
             f.kw_only = True
     # validate settings and save fields/params
-    params = DataParams(init, repr, iter, eq, order, unsafe_hash, 
+    params = DataParams(init, repr, iter, eq, order, unsafe_hash,
         frozen, match_args, kw_only, slots, recurse, field)
     if isdataclass:
         ofields = getattr(cls, FIELD_ATTR)
@@ -276,7 +280,7 @@ def _process_class(
         assign_func(cls, initfunc, overwrite=overwrite)
     if repr or repr is None:
         overwrite = repr is True
-        assign_func(cls, create_repr(fields), overwrite=overwrite)
+        assign_func(cls, create_repr(fields, hide_repr), overwrite=overwrite)
     if iter or iter is None or any(f.iter for f in fields):
         overwrite = iter is True
         assign_func(cls, create_iter(fields), overwrite=overwrite)
@@ -320,9 +324,10 @@ def _process_class(
 
 @overload
 @dataclass_transform(field_specifiers=(FieldDef, Field, field))
-def dataclass(cls: Type[T], 
-    init:        Optional[bool] = None,
-    repr:        Optional[bool] = None,
+def dataclass(cls: Type[T],
+    init:        Optional[bool]     = None,
+    repr:        Optional[bool]     = None,
+    hide_repr:   Optional[ReprHide] = None,
     eq:          bool = True,
     order:       bool = False,
     unsafe_hash: bool = False,
@@ -339,8 +344,9 @@ def dataclass(cls: Type[T],
 
 @overload
 def dataclass(*,
-    init:        Optional[bool] = None,
-    repr:        Optional[bool] = None,
+    init:        Optional[bool]     = None,
+    repr:        Optional[bool]     = None,
+    hide_repr:   Optional[ReprHide] = None,
     eq:          bool = True,
     order:       bool = False,
     unsafe_hash: bool = False,
@@ -389,17 +395,17 @@ class DataClassLike(Generic[F], Protocol):
 class DataParams:
     """Pseudo Dataclass to store parameters used to generate dataclass"""
     __slots__ = (
-        'init', 
+        'init',
         'repr',
         'iter',
-        'eq', 
-        'order', 
+        'eq',
+        'order',
         'unsafe_hash',
-        'frozen', 
-        'match_args', 
-        'kw_only', 
-        'slots', 
-        'recurse', 
+        'frozen',
+        'match_args',
+        'kw_only',
+        'slots',
+        'recurse',
         'field')
 
     def __init__(self,

@@ -12,8 +12,8 @@ from .abc import MISSING, FieldDef, FieldType, Fields
 
 #** Variables **#
 __all__ = [
-    'monkey_patch', 
-    'convert_fields', 
+    'monkey_patch',
+    'convert_fields',
     'convert_params',
     'std_convert_fields',
     'std_assign_fields',
@@ -78,7 +78,7 @@ def convert_fields(cls, field: Type[FieldDef]) -> Fields:
     :return:      converted field attributes
     """
     # ensure type is dataclass or return
-    dataclasses = _import_std_dataclasses() 
+    dataclasses = _import_std_dataclasses()
     if not dataclasses:
         return []
     if not dataclasses.is_dataclass(cls):
@@ -107,7 +107,7 @@ def convert_fields(cls, field: Type[FieldDef]) -> Fields:
 def convert_params(cls):
     """
     convert dataclass params to the correct-type if a dataclass
-    
+
     :param cls: stdlib dataclass to retireve parameters from
     :return:    pyderive dataclass parameters
     """
@@ -134,7 +134,7 @@ def _convert_anno(anno: Type):
         return anno
     origin = ANNO_MAP.get(origin) or origin
     args = tuple([_convert_anno(subanno) for subanno in get_args(anno)])
-    return origin[args] 
+    return origin[args]
 
 def std_convert_fields(cls):
     """
@@ -155,7 +155,7 @@ def std_convert_fields(cls):
     }
     ignore = {'anno', 'field_type'}
     def _missing(v):
-        return dataclasses.MISSING if v is MISSING else v 
+        return dataclasses.MISSING if v is MISSING else v
     # convert fields when required
     stdfields = []
     for field in getattr(cls, FIELD_ATTR):
@@ -164,7 +164,7 @@ def std_convert_fields(cls):
         for name, value in field.__dict__.items():
             if name in ignore or name in dataclasses.Field.__slots__:
                 continue
-            metadata[name] = value 
+            metadata[name] = value
         # generate stdfield and add to field definitions
         stdfield = dataclasses.field(
             init=field.init,
@@ -205,7 +205,7 @@ def std_assign_fields(cls):
 def std_convert_dataclass(cls, **kwargs):
     """
     convert pyderive dataclass to stdlib dataclass for 3rd party compatability
-    
+
     :param cls: pyderive dataclass
     :return:    stdlib dataclass
     """
@@ -235,7 +235,7 @@ def std_convert_dataclass(cls, **kwargs):
         kwargs.setdefault('slots', params.slots)
     # finalize dataclass generation
     dataclass = dataclasses.make_dataclass(name, attrs, bases=bases, **kwargs)
-    # #NOTE: this magic resolves some seemingly random issues when passing 
+    # #NOTE: this magic resolves some seemingly random issues when passing
     # # dataclasses to other 3rd party libraries
     @dataclasses.dataclass
     class DataClass(dataclass):

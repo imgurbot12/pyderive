@@ -19,8 +19,8 @@ __all__ = [
 
     'has_generics',
     'is_generic_instance',
-    'find_generics', 
-    'update_generics', 
+    'find_generics',
+    'update_generics',
     'generic_getitem'
 ]
 
@@ -174,9 +174,9 @@ def update_generics(cls: Type):
         fields[pos] = field
     setattr(cls, FIELD_ATTR, fields)
 
-#NOTE: Hacky AF. Retrieves underlying base Generic getitem 
-# function to generate and alias, generates a subclass from 
-# alias as would be typical and then updates the associated 
+#NOTE: Hacky AF. Retrieves underlying base Generic getitem
+# function to generate and alias, generates a subclass from
+# alias as would be typical and then updates the associated
 # fields w/ new type assignments
 @classmethod
 @functools.lru_cache(maxsize=None)

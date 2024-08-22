@@ -8,13 +8,13 @@ from .validators import T, Validator, TypeValidator, chain_validators
 
 #** Variables **#
 __all__ = [
-    'Min', 
-    'Max', 
-    'Range', 
-    'RangeLength', 
-    'Length', 
-    'Regex', 
-    'BoolFunc', 
+    'Min',
+    'Max',
+    'Range',
+    'RangeLength',
+    'Length',
+    'Regex',
+    'BoolFunc',
     'IsAlNum'
 ]
 
@@ -71,7 +71,7 @@ def Length(l: int) -> TypeValidator:
         return s
     return Validator[length]
 
-def RangeLength(min: Optional[int] = None, 
+def RangeLength(min: Optional[int] = None,
     max: Optional[int] = None) -> TypeValidator:
     """
     Generate RangeLength Validator for Lengthable Object
@@ -108,7 +108,7 @@ def Regex(r: str, **kwargs) -> TypeValidator:
         return s
     return Validator[match_regex]
 
-def BoolFunc(f: Callable[[T], bool], 
+def BoolFunc(f: Callable[[T], bool],
     msg: Optional[str] = None) -> TypeValidator[T]:
     """
     Generate Boolean Validation Function w/ Given Message
