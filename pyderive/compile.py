@@ -182,16 +182,18 @@ def _stdfields(fields: Fields) -> Iterator[FieldDef]:
     """retrieve only standard fields from fields-list"""
     return (f for f in fields if f.field_type == FieldType.STANDARD)
 
-def _repr_value(field: FieldDef, hide: Optional[ReprHide] = None) -> str:
+def _repr_value(num: int,
+    field: FieldDef, hide: Optional[ReprHide] = None) -> str:
     """generate repr field entry based on hide/field settings"""
+    c    = ', ' if num != 0 else ''
     hide = field.metadata.get('hide') or hide
     name = field.name
     attr = f'self.{name}'
     if hide == 'null':
-        return f'(("{name}=" + repr({attr})) if {attr} is not None else "")'
+        return f'(("{c}{name}=" + repr({attr})) if {attr} is not None else "")'
     elif hide == 'empty':
-        return f'(("{name}=" + repr({attr})) if {attr} else "")'
-    return f'"{name}=" + repr({attr})'
+        return f'(("{c}{name}=" + repr({attr})) if {attr} else "")'
+    return f'"{c}{name}=" + repr({attr})'
 
 def create_repr(fields: Fields, hide: Optional[ReprHide] = None) -> Callable:
     """
@@ -201,10 +203,11 @@ def create_repr(fields: Fields, hide: Optional[ReprHide] = None) -> Callable:
     :param hide:   optional hide setting for repr
     :param return: repr-function
     """
+    std_fields = enumerate(_stdfields(fields), 0)
     body = 'return self.__class__.__qualname__ + "("'
     if fields:
         body += '\\\n + '
-        body += '\\\n + "," + '.join(_repr_value(f, hide) for f in _stdfields(fields))
+        body += '\\\n + '.join(_repr_value(n, f, hide) for n,f in std_fields)
     body += ' + ")"'
     func = _create_fn('__repr__', ['self'], [body])
     return recursive_repr('...')(func)

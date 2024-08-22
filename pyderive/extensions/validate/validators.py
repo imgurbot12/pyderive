@@ -568,7 +568,7 @@ class ValidationError(ValueError):
             f'  Message:  {self.message!r}',
         ])
 
-class FieldValidationError(ValueError):
+class FieldValidationError(ValidationError):
     """Exception Raised When Field Validation Fails"""
     etype:   str
     title:   str

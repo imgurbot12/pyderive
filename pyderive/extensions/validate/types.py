@@ -20,12 +20,15 @@ __all__ = [
     'IPvAnyAddress',
     'IPvAnyNetwork',
     'IPvAnyInterface',
+    'Domain',
     'Email',
+    'UUID',
+    'MacAddr',
+    'PhoneNumber',
 
     'Bytes',
     'HexBytes',
     'URL',
-    'Domain',
     'Host',
     'Port',
     'ExistingFile',
@@ -37,13 +40,16 @@ __all__ = [
 #: functions needed for IO impl
 IO_FUNCS = [var for var, value in vars(IO).items() if callable(value)]
 
-_re_domain = re.compile(r'^(?:[a-zA-Z0-9_](?:[a-zA-Z0-9-_]{0,61}' + \
-  r'[A-Za-z0-9])?\.)+[A-Za-z0-9][A-Za-z0-9-_]{0,61}[A-Za-z]\.?$')
+_re_domain = r'^(?:[a-zA-Z0-9_](?:[a-zA-Z0-9-_]{0,61}' + \
+  r'[A-Za-z0-9])?\.)+[A-Za-z0-9][A-Za-z0-9-_]{0,61}[A-Za-z]\.?$'
 
 _re_timedelta = re.compile(r'^(\d+[a-z]+)+$')
 _re_timedelta_group = re.compile(r'\d+[a-z]+')
 
-_re_email = r"""(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|\"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*\")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])"""
+_re_email    = r"""(?:[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*|"(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*")@(?:(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?|\[(?:(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9]))\.){3}(?:(2(5[0-5]|[0-4][0-9])|1[0-9][0-9]|[1-9]?[0-9])|[a-z0-9-]*[a-z0-9]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\])"""
+_re_uuid     = r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$'
+_re_mac_addr = r'^(?:[a-fA-F0-9]{2}[-:]?){5}[a-fA-F0-9]{2}$'
+_re_phone    = r'^(?:\+?\d{1,4}-?)?[0-9]{3}-?[0-9]{3}-?[0-9]{4}$'
 
 IPv4 = Annotated[Union[IPv4Address, str, bytes], PreValidator[IPv4Address]]
 IPv6 = Annotated[Union[IPv6Address, str, bytes], PreValidator[IPv6Address]]
@@ -52,7 +58,11 @@ IPvAnyAddress = Annotated[Union[IPv4Address, IPv6Address, str, bytes], PreValida
 IPvAnyNetwork = Annotated[Union[IPv4Network, IPv6Network, str, bytes], PreValidator[ip_network]]
 IPvAnyInterface = Annotated[Union[IPv4Interface, IPv6Interface, str, bytes], PreValidator[ip_interface]]
 
-Email = Annotated[str, Regex(_re_email)]
+Domain      = Annotated[str, Regex(_re_domain)]
+Email       = Annotated[str, Regex(_re_email)]
+UUID        = Annotated[str, Regex(_re_uuid)]
+MacAddr     = Annotated[str, Regex(_re_mac_addr)]
+PhoneNumber = Annotated[str, Regex(_re_phone)]
 
 #** Function **#
 
@@ -73,12 +83,6 @@ def is_url(value: str) -> str:
     url = urlsplit(value)
     if not url.scheme or not url.netloc:
         raise ValueError(f'Invalid URL: {value!r}')
-    return value
-
-def is_domain(value: str) -> str:
-    """check that value is valid domain"""
-    if _re_domain.match(value) is None:
-        raise ValueError(f'Invalid Domain: {value!r}')
     return value
 
 def is_existing_file(value: str) -> str:
@@ -174,9 +178,6 @@ HexBytes = Annotated[Union[str, bytes], PreValidator[is_hexbytes]]
 
 #: validate string is a url
 URL = Annotated[str, Validator[is_url]]
-
-#: validate string is a domain
-Domain = Annotated[str, Validator[is_domain]]
 
 #: validate hostname
 Host = Union[IPvAnyAddress, Domain]

@@ -253,11 +253,13 @@ def _process_class(
         for f in fields:
             f.kw_only = True
     # validate settings and save fields/params
-    params = DataParams(init, repr, iter, eq, order, unsafe_hash,
+    params = DataParams(init, repr, iter, hide_repr, eq, order, unsafe_hash,
         frozen, match_args, kw_only, slots, recurse, field)
     if isdataclass:
         ofields = getattr(cls, FIELD_ATTR)
         oparams = getattr(cls, PARAMS_ATTR)
+        # preserve hide_repr setting between subclasses
+        hide_repr = hide_repr or oparams.hide_repr
         # ensure there are no frozen conflicts
         if frozen and not (oparams.frozen or all(f.frozen for f in ofields)):
             raise TypeError(
@@ -398,6 +400,7 @@ class DataParams:
         'init',
         'repr',
         'iter',
+        'hide_repr',
         'eq',
         'order',
         'unsafe_hash',
@@ -412,6 +415,7 @@ class DataParams:
         init:        Optional[bool],
         repr:        Optional[bool],
         iter:        Optional[bool],
+        hide_repr:   Optional[ReprHide],
         eq:          bool,
         order:       bool,
         unsafe_hash: bool,
@@ -425,6 +429,7 @@ class DataParams:
         self.init        = init
         self.repr        = repr
         self.iter        = iter
+        self.hide_repr   = hide_repr
         self.eq          = eq
         self.order       = order
         self.unsafe_hash = unsafe_hash
