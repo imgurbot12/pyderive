@@ -4,9 +4,9 @@ PyDerive UnitTests
 
 #** Variables **#
 __all__ = [
-    'DataClassTests', 
+    'DataClassTests',
     'SerdeTests',
-    'ValidationTests', 
+    'ValidationTests',
     'ValidationModelTests',
     'GenericValidationTests',
 ]

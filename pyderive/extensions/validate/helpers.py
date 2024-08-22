@@ -22,7 +22,7 @@ I = TypeVar('I', bound=Union[int, float])
 
 #** Functions **#
 
-def Min(m: Union[int, float]) -> TypeValidator:
+def Min(m: Union[int, float]) -> Validator:
     """
     Generate Minimum Value Validator for Integers/Floats
     """
@@ -32,9 +32,9 @@ def Min(m: Union[int, float]) -> TypeValidator:
         if i <= type(i)(m):
             raise ValueError(f'{i!r} below minimum: {m!r}')
         return i
-    return Validator[min]
+    return Validator(min)
 
-def Max(m: Union[int, float]) -> TypeValidator:
+def Max(m: Union[int, float]) -> Validator:
     """
     Generate Maximum Value Validator for Integers/Floats
     """
@@ -44,9 +44,9 @@ def Max(m: Union[int, float]) -> TypeValidator:
         if i >= type(i)(m):
             raise ValueError(f'{i!r} below maximum: {m!r}')
         return i
-    return Validator[max]
+    return Validator(max)
 
-def Range(low: int, high: int) -> TypeValidator:
+def Range(low: int, high: int) -> Validator:
     """
     Generate Minimum/Maximum Range Controls for Integers/Floats
 
@@ -55,9 +55,9 @@ def Range(low: int, high: int) -> TypeValidator:
     """
     minv = Min(low)
     maxv = Max(high)
-    return Validator[chain_validators([minv.validator, maxv.validator])]
+    return Validator(chain_validators([minv.validator, maxv.validator]))
 
-def Length(l: int) -> TypeValidator:
+def Length(l: int) -> Validator:
     """
     Generate Length Validator for Lengthable Object
 
@@ -69,7 +69,7 @@ def Length(l: int) -> TypeValidator:
         if len(s) != l:
             raise ValueError(f'{s!r} too long: {len(s)} > {l}')
         return s
-    return Validator[length]
+    return Validator(length)
 
 def RangeLength(min: Optional[int] = None,
     max: Optional[int] = None) -> TypeValidator:
@@ -92,7 +92,7 @@ def RangeLength(min: Optional[int] = None,
         return s
     return Validator[length]
 
-def Regex(r: str, **kwargs) -> TypeValidator:
+def Regex(r: str, **kwargs) -> Validator:
     """
     Generate Regex Validator for String Object
 
@@ -106,10 +106,10 @@ def Regex(r: str, **kwargs) -> TypeValidator:
         if not pattern.match(s):
             raise ValueError(f'{s!r} Does NOT Match Expected Pattern')
         return s
-    return Validator[match_regex]
+    return Validator(match_regex)
 
 def BoolFunc(f: Callable[[T], bool],
-    msg: Optional[str] = None) -> TypeValidator[T]:
+    msg: Optional[str] = None) -> Validator:
     """
     Generate Boolean Validation Function w/ Given Message
 
@@ -121,8 +121,9 @@ def BoolFunc(f: Callable[[T], bool],
         if not f(t):
             raise ValueError(message)
         return t
-    return boolfunc
+    return Validator(boolfunc)
 
 #** Init **#
 
-IsAlNum = BoolFunc(lambda x: x.isalnum, 'String is Not AlphaNumeric')
+IsAlNum = BoolFunc(lambda x: isinstance(x, str) and x.isalnum(),
+                   'String is Not AlphaNumeric')

@@ -3,7 +3,7 @@ PyDerive DataClass UnitTests
 """
 import unittest
 import dataclasses
-from typing import ClassVar, List
+from typing import ClassVar, List, Optional
 
 from ..dataclasses import *
 
@@ -13,6 +13,41 @@ __all__ = ['DataClassTests']
 #** Classes **#
 
 class DataClassTests(unittest.TestCase):
+
+    def test_repr_standard(self):
+        """ensure standard repr works as intended"""
+        @dataclass
+        class Foo:
+            a: int
+            b: bool
+            c: Optional[str] = None
+        name = Foo.__qualname__
+        foo1 = Foo(0, False, None)
+        self.assertEqual(repr(foo1), f'{name}(a=0, b=False, c=None)')
+
+    def test_repr_hidden_null(self):
+        """ensure repr (hidden on null) works as intended"""
+        @dataclass(hide_repr='null')
+        class Foo:
+            a: Optional[str]
+            b: int
+            c: List[str]
+            d: bool
+        name = Foo.__qualname__
+        foo1 = Foo(None, 0, [], False)
+        self.assertEqual(repr(foo1), f'{name}(b=0, c=[], d=False)')
+
+    def test_repr_empty(self):
+        """ensure repr (hidden on empty) works as intended"""
+        @dataclass(hide_repr='empty')
+        class Foo:
+            a: Optional[str]
+            b: int
+            c: List[str]
+            d: bool
+        name = Foo.__qualname__
+        foo1 = Foo(None, 0, [], False)
+        self.assertEqual(repr(foo1), f'{name}(b=0, d=False)')
 
     def test_initvar(self):
         """ensure InitVar works as intended"""
@@ -28,7 +63,7 @@ class DataClassTests(unittest.TestCase):
         self.assertFalse(hasattr(t, 'b'))
         self.assertTrue(hasattr(t, 'extra'))
         self.assertEqual(t.extra, 2)
- 
+
     def test_classvar(self):
         """ensure ClassVar works as intended"""
         @dataclass
@@ -60,7 +95,7 @@ class DataClassTests(unittest.TestCase):
         self.assertTrue(is_dataclass(Bar))
         self.assertTrue(dataclasses.is_dataclass(Bar))
         self.assertTrue(len(dataclasses.fields(Bar)) == 3)
- 
+
     def test_frozen(self):
         """validate frozen attribute works"""
         @dataclass

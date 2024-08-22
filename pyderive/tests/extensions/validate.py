@@ -27,7 +27,7 @@ class ValidationTests(TestCase):
         self.assertRaises(FieldValidationError, Foo, 1.2, 'a', 3.4)
         self.assertRaises(FieldValidationError, Foo, 5, 6, 7)
         self.assertRaises(FieldValidationError, Foo, 9, 'c', 10)
-    
+
     def test_typecast_simple(self):
         """ensure simple typecasting works"""
         @validate(typecast=True)
@@ -56,7 +56,7 @@ class ValidationTests(TestCase):
         self.assertRaises(FieldValidationError, Foo, [1, 2, 3.0], {1.1, 2.2, 3.3})
         self.assertRaises(FieldValidationError, Foo, [1, 2, 3], {1.1, 2.2, 3})
         self.assertRaises(FieldValidationError, Foo, [1, 2, 3], {'1.1', 2.2, 3.3})
-    
+
     def test_typecast_sequence(self):
         """ensure sequence typecasting works"""
         @validate(typecast=True)
@@ -86,7 +86,7 @@ class ValidationTests(TestCase):
         self.assertRaises(FieldValidationError, Foo, (1, 2, 'ok'), (1, ))
         self.assertRaises(FieldValidationError, Foo, (1, 1.2, 3), (1, ))
         self.assertRaises(FieldValidationError, Foo, (1, 1.2, 'ok'), (1, 'ok', ))
- 
+
     def test_typecast_tuple(self):
         """ensure tuple typecasting works properly"""
         @validate(typecast=True)
@@ -108,7 +108,7 @@ class ValidationTests(TestCase):
         self.assertRaises(FieldValidationError, Foo, 1.1)
         self.assertRaises(FieldValidationError, Foo, [])
         self.assertRaises(FieldValidationError, Foo, object())
-    
+
     def test_typecast_union(self):
         """ensure union typecasting works properly"""
         @validate(typecast=True)
@@ -184,7 +184,7 @@ class ValidationModelTests(TestCase):
         foo.validate()
         foo.a.extend(['d', 1])
         self.assertRaises(FieldValidationError, foo.validate)
-    
+
     def test_model_parsing(self):
         """ensure `BaseModel.parse_obj` function works as intended"""
         class Bar(BaseModel):
@@ -196,7 +196,7 @@ class ValidationModelTests(TestCase):
         foo2 = Foo.parse_obj(((1, 'ok', 2.1), [1.1]))
         self.assertEqual(foo1, foo2)
         self.assertRaises(FieldValidationError, Foo.parse_obj, {'a': (1.0, 'ok', 2.1), 'bar': {'x': 'ok'}})
- 
+
     def test_model_complex(self):
         """ensure `BaseModel`.valdiate function works on complex objects"""
         class Bar(BaseModel):
@@ -231,7 +231,7 @@ class ValidationModelTests(TestCase):
 
 class GenericValidationTests(TestCase):
     """Validation for Generics UnitTests"""
- 
+
     def test_simple(self):
         """test simple generics assignemnt"""
         T = TypeVar('T')

@@ -617,7 +617,10 @@ class Validator:
             raise TypeError('Validator: {validator!r} is not callable')
         self.validator = validator
 
-    def __class_getitem__(cls, validator: TypeValidator):
+    def __call__(self, *args, **kwargs):
+        return self.validator(*args, **kwargs)
+
+    def __class_getitem__(cls, validator: TypeValidator) -> 'Validator':
         return cls(validator)
 
 class PreValidator(Validator):
