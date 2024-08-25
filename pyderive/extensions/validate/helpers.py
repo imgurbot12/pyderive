@@ -29,7 +29,7 @@ def Min(m: Union[int, float]) -> Validator:
     def min(i: I) -> I:
         if not isinstance(i, (int, float, complex)):
             raise ValueError(f'Invalid Type for Minimum: {i}')
-        if i <= type(i)(m):
+        if i < type(i)(m):
             raise ValueError(f'{i!r} below minimum: {m!r}')
         return i
     return Validator(min)
@@ -41,7 +41,7 @@ def Max(m: Union[int, float]) -> Validator:
     def max(i: I) -> I:
         if not isinstance(i, (int, float, complex)):
             raise ValueError(f'Invalid Type for Maximum: {i}')
-        if i >= type(i)(m):
+        if i > type(i)(m):
             raise ValueError(f'{i!r} below maximum: {m!r}')
         return i
     return Validator(max)
