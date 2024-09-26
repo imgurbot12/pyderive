@@ -116,6 +116,23 @@ def simple_validator(anno: Type[T], typecast: bool) -> TypeValidator[T]:
             f'parse_{name}', f'Invalid {name}')
     return validator
 
+def literal_validator(anno: Tuple[T]) -> TypeValidator[T]:
+    """
+    generate literal value validator for the specified value
+
+    :param anno: python values acting as annotation
+    :return:     type-validator that attempts typecast
+    """
+    name = f'validate_literal({anno!r})'
+    @_wrap(name)
+    def validator(value: Any) -> Any:
+        check_missing(value, anno)
+        if value in anno:
+            return value
+        raise ValidationError((Literal[anno], ), value,
+            'invalid_literal', 'Unexpected Value')
+    return validator
+
 def seq_validator(outer: Type, base: Type, iv: TypeValidator, typecast: bool) -> TypeValidator:
     """
     generate generic sequence-type typecast validator for the specified type
@@ -293,6 +310,7 @@ def union_validator(anno: Type,
     # parse valid simple python types from specified arguments
     # those are the only ones allowed for faster `isinstance` check
     wrapped = list(args)
+    anno_names  = []
     annotations = []
     while wrapped:
         sanno = wrapped.pop()
@@ -305,6 +323,11 @@ def union_validator(anno: Type,
             wrapped.append(subargs[0])
         elif origin is Union:
             wrapped.extend(subargs)
+        # track annotation names for validation-error
+        anno_name = origin or sanno
+        if anno_name not in anno_names:
+            anno_names.append(anno_name)
+    anno_names  = tuple(anno_names)
     annotations = tuple(annotations)
     # generate valdiator object
     @_wrap(_anno_name(anno))
@@ -317,7 +340,7 @@ def union_validator(anno: Type,
                 return validator(value)
             except ValueError:
                 pass
-        raise ValidationError(annotations,
+        raise ValidationError(anno_names,
             value, 'parse_union', 'Unable to Match Union')
     return validator
 
@@ -449,6 +472,9 @@ def type_validator(anno: Type,
             elif isinstance(value, Validator):
                 middle.append(value.validator)
         return chain_validators([*pre, *middle, *post])
+    # support `Literal` annotation
+    if origin is Literal:
+        return literal_validator(args)
     # check for `Type` annotation
     if origin is type:
         return subclass_validator(args[0])
