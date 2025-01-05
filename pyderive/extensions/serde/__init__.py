@@ -27,6 +27,10 @@ __all__ = [
     'Serializer',
     'Deserializer',
 
+    'SerdeError',
+    'SerdeParseError',
+    'UnknownField',
+
     'Serde',
     'Serialize',
     'Deserialize',

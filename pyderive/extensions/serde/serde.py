@@ -33,6 +33,7 @@ __all__ = [
 
     'SerdeError',
     'SerdeParseError',
+    'UnknownField',
     'SerdeParams',
     'SerdeField',
     'TypeEncoder',
@@ -378,7 +379,7 @@ def from_mapping(
         if key not in fdict:
             if allow_unknown:
                 continue
-            raise SerdeParseError(f'Unknown Key: {key!r}', path)
+            raise UnknownField(key, path)
         # translate value based on annotation
         field = fdict[key]
         name  = field.name
@@ -474,11 +475,17 @@ class SerdeError(ValueError):
 
 class SerdeParseError(ValueError, PathError):
     """Custom Conversion Exception"""
-    path: List[str]
 
     def __init__(self, message: str, path: List[str]):
         self.message = message
         self.path    = path
+
+class UnknownField(SerdeParseError):
+
+    def __init__(self, field: str, path: List[str]):
+        self.path    = path
+        self.field   = field
+        self.message = 'Unknown Field'
 
 @dataclass(slots=True)
 class SerdeParams:
