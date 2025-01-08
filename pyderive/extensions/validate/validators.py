@@ -6,7 +6,9 @@ import sys
 import json
 import typing
 from enum import Enum
-from typing import *
+from typing import (
+    Any, Callable, Dict, ForwardRef, Generic, Iterable, List, Literal,
+    Mapping, Optional, Protocol, Sequence, Tuple, Type, TypeVar, Union, cast)
 from typing_extensions import Annotated, runtime_checkable, get_origin, get_args
 
 from ..serde import is_sequence
@@ -80,7 +82,9 @@ def is_autogen(f: Callable) -> bool:
     return hasattr(f, VALIDATOR_MARKER)
 
 def check_missing(anno: Union[Type, Iterable[Type]], value: Any):
-    """check that the specified value is not MISSING"""
+    """
+    check that the specified value is not MISSING
+    """
     if value is MISSING:
         anno_tup = tuple(anno) if is_sequence(anno) else (anno, ) #type: ignore
         raise ValidationError(anno_tup, None, 'missing', 'Field required')
@@ -133,7 +137,8 @@ def literal_validator(anno: Tuple[T]) -> TypeValidator[T]:
             'invalid_literal', 'Unexpected Value')
     return validator
 
-def seq_validator(outer: Type, base: Type, iv: TypeValidator, typecast: bool) -> TypeValidator:
+def seq_validator(outer: Type,
+    base: Type, iv: TypeValidator, typecast: bool) -> TypeValidator:
     """
     generate generic sequence-type typecast validator for the specified type
 

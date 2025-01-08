@@ -3,18 +3,19 @@ XML Serializer/Deserializer Utilities
 """
 from abc import abstractmethod
 import importlib
-from typing import *
+from typing import (
+    Any, Callable, Dict, Iterator, List, Mapping, Optional,
+    Protocol, Sequence, Set, Tuple, Type, Union, cast)
 from typing_extensions import get_origin, get_args
 
 from .serde import *
-from .serde import RENAME_ATTR
+from .serde import RENAME_ATTR, SUPPORTED_TYPES
 from ...dataclasses import is_dataclass, fields
-from .serde import SUPPORTED_TYPES
 
 #** Variables **#
 __all__ = ['xml_allow_attr', 'to_xml', 'from_xml', 'from_string', 'to_string']
 
-ToStringFunc   = Callable[['Element'], str]
+ToStringFunc   = Callable[..., str]
 FromStringFunc = Callable[[str], 'Element']
 
 #: types allowed as xml attributes
@@ -26,7 +27,7 @@ def find_element() -> Tuple[ToStringFunc, FromStringFunc, Type['Element']]:
     """
     generate new xml element from list of supported libraries
     """
-    names = ('pyxml', 'lxml.etree', 'xml.etree.ElementTree')
+    names = ('pyxml', 'lxml.etree', 'xml.etree.ElementTree', )
     for name in names:
         try:
             library = importlib.import_module(name)
@@ -205,7 +206,8 @@ def _fromxml_inner(pos: int, anno: Type, elem: 'Element', args: tuple) -> Any:
                 return newval
     # handle defined sequences
     elif origin in (list, set, Sequence):
-        ianno = get_args(anno)[0]
+        origin = cast(Type[list], list if origin is Sequence else origin)
+        ianno  = get_args(anno)[0]
         return origin([_fromxml_inner(pos, ianno, elem, args)])
     # handle defined tuples
     elif origin is tuple:
@@ -220,7 +222,7 @@ def _fromxml_inner(pos: int, anno: Type, elem: 'Element', args: tuple) -> Any:
             key   = child.tag
             value = _fromxml_inner(pos, vanno, child, args)
             result[key] = value
-        return origin(result)
+        return dict(result)
     # handle simple string conversion types
     elif anno in ALLOWED_ATTRS:
         try:
@@ -229,7 +231,7 @@ def _fromxml_inner(pos: int, anno: Type, elem: 'Element', args: tuple) -> Any:
             pass
     return elem.text
 
-def to_string(cls, **kwargs) -> str:
+def to_string(cls, xml_declaration: Optional[str] = '', **kwargs) -> str:
     """
     convert dataclass to xml string
 
@@ -238,7 +240,7 @@ def to_string(cls, **kwargs) -> str:
     :return:       xml string equivalent
     """
     root   = to_xml(cls, **kwargs)
-    string = ToString(root)
+    string = ToString(root, xml_declaration=xml_declaration)
     return string.decode() if isinstance(string, bytes) else string
 
 def from_string(cls: Type[T], xml: str, **kwargs) -> T:

@@ -3,7 +3,9 @@ Custom DataClass Internal Types
 """
 from abc import abstractmethod
 from enum import IntEnum
-from typing import *
+from typing import (
+    Any, Callable, Dict, Generic, List, Literal, Optional,
+    Protocol, Type, TypeVar, Union)
 from typing_extensions import Annotated, Self, \
     runtime_checkable, get_origin, get_args
 
@@ -29,6 +31,7 @@ __all__ = [
     'Field',
     'FlatStruct',
     'ClassStruct',
+    'DataClassLike',
 ]
 
 #: generic typevar
@@ -89,9 +92,9 @@ class FieldType(IntEnum):
     INIT_VAR = 2
 
 @runtime_checkable
-class FieldDef(Protocol):
+class FieldDef(Protocol[TypeT]):
     name:            str
-    anno:            Type
+    anno:            TypeT
     default:         Any            = MISSING
     default_factory: DefaultFactory = MISSING
     init:            bool           = True
@@ -113,11 +116,11 @@ class FieldDef(Protocol):
         """run finalize when field variables are finished compiling"""
         pass
 
-class Field(FieldDef):
+class Field(FieldDef[TypeT]):
 
     def __init__(self,
         name:            str,
-        anno:            Type,
+        anno:            TypeT,
         default:         Any            = MISSING,
         default_factory: DefaultFactory = MISSING,
         init:            bool           = True,
@@ -194,3 +197,8 @@ class ClassStruct(FlatStruct):
         if self.parent is not None:
             return self.parent.is_anno_compiled(anno)
         return False
+
+@runtime_checkable
+class DataClassLike(Generic[F], Protocol):
+    """Protocol for DataClass-Like Objects"""
+    __datafields__: List[F]

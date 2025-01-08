@@ -3,8 +3,10 @@ DataClass stdlib recreation using existing helpers
 """
 import abc
 import copy
-from typing import *
-from typing_extensions import dataclass_transform, runtime_checkable
+from typing import (
+    Any, Callable, Dict, List, Optional,
+    Tuple, Type, Union, overload)
+from typing_extensions import dataclass_transform
 
 from .abc import *
 from .abc import ReprHide
@@ -16,7 +18,6 @@ from .compat import is_stddataclass, convert_params, std_assign_fields
 __all__ = [
     'InitVar',
     'MISSING',
-    'DataClassLike',
     'FrozenInstanceError',
 
     'TupleFactory',
@@ -92,15 +93,7 @@ def is_dataclass(cls) -> bool:
     """
     return hasattr(cls, FIELD_ATTR)
 
-@overload
-def fields(cls: Any, all_types: bool = False) -> List[FieldDef]:
-    ...
-
-@overload
-def fields(cls: 'DataClassLike[F]', all_types: bool = False) -> List[F]:
-    ...
-
-def fields(cls, all_types: bool = False):
+def fields(cls, all_types: bool = False) -> List[FieldDef]:
     """
     retrieve fields associated w/ the given dataclass
 
@@ -388,11 +381,6 @@ def dataclass(cls: Optional[TypeT] = None, *_, **kw) -> Union[TypeT, DataFunc]:
     return wrapper if cls is None else wrapper(cls)
 
 #** Classes **#
-
-@runtime_checkable
-class DataClassLike(Generic[F], Protocol):
-    """Protocol for DataClass-Like Objects"""
-    __datafields__: List[F]
 
 class DataParams:
     """Pseudo Dataclass to store parameters used to generate dataclass"""

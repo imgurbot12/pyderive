@@ -5,7 +5,9 @@ from datetime import datetime, timedelta
 import os
 import re
 import logging
-from ipaddress import *
+from ipaddress import (
+    IPv4Address, IPv4Interface, IPv4Network, IPv6Address, IPv6Interface,
+    IPv6Network, ip_address, ip_interface, ip_network)
 from typing import Any, IO, BinaryIO, TextIO, Union
 from typing_extensions import Annotated
 from urllib.parse import urlsplit

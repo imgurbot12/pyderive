@@ -103,7 +103,6 @@ class DataClassTests(unittest.TestCase):
             a: int = 0
         @dataclass
         class Bar(Foo):
-            a: int
             b: int = field(default=1, frozen=True)
         bar = Bar(1, 2)
         bar.a = 3

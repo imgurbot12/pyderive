@@ -3,7 +3,9 @@ Serde Serialization/Deserialization Tools/Baseclasses
 """
 import ipaddress
 from abc import abstractmethod
-from typing import *
+from typing import (
+    Any, Callable, Dict, List, Mapping, Optional, Protocol,
+    Sequence, Set, Tuple, Type, TypeVar, Union, cast)
 from typing_extensions import runtime_checkable, get_origin, get_args
 
 from ... import BaseField
@@ -113,7 +115,9 @@ def is_serde(cls) -> bool:
     return params is not None and cls in params.bases
 
 def field_dict(cls) -> Dict[str, FieldDef]:
-    """retrieve dictionary of valid field definitions"""
+    """
+    retrieve dictionary of valid field definitions
+    """
     fdict  = {}
     fields = getattr(cls, FIELD_ATTR)
     for field in fields:
@@ -124,7 +128,9 @@ def field_dict(cls) -> Dict[str, FieldDef]:
     return fdict
 
 def skip_field(field: FieldDef, value: Any) -> bool:
-    """return true if field should be skipped"""
+    """
+    return true if field should be skipped
+    """
     metadata = field.metadata
     if metadata.get(SKIP_ATTR, False):
         return True
@@ -142,24 +148,32 @@ def skip_field(field: FieldDef, value: Any) -> bool:
     return False
 
 def is_sequence(value: Any) -> bool:
-    """return true if the given value is a valid sequence"""
+    """
+    return true if the given value is a valid sequence
+    """
     return isinstance(value, (set, Sequence)) and not isinstance(value, str)
 
 def anno_is_namedtuple(anno) -> bool:
-    """return true if the given annotation is a named tuple"""
+    """
+    return true if the given annotation is a named tuple
+    """
     return isinstance(anno, type) \
         and issubclass(anno, tuple) \
         and hasattr(anno, '_fields')
 
 def namedtuple_annos(anno: Type) -> Tuple[List[str], Tuple[Type, ...]]:
-    """retrieve annotations for the given tuple"""
+    """
+    retrieve annotations for the given tuple
+    """
     fields   = getattr(anno, '_fields')
     annodict = getattr(anno, '__annotations__', {})
     args     = [annodict.get(field, str) for field in fields]
     return (fields, tuple(args))
 
 def _unexpected(name: str, anno: Type, value: Any, path: List[str]):
-    """raise unexpected type error when parsing objects"""
+    """
+    raise unexpected type error when parsing objects
+    """
     return SerdeParseError(
         f'Field: {name!r} Expected: {anno!r}, Got: {type(value)!r}', path)
 
@@ -171,7 +185,7 @@ def _parse_tuple(
     value:   Any,
     decoder: 'TypeDecoder',
     path:    List[str],
-    kwargs: dict
+    kwargs:  dict
 ) -> tuple:
     """
     parse tuple value according to annotation
@@ -263,7 +277,7 @@ def _parse_object(
             value, decoder, path, kwargs)
     # handle defined sequence types
     elif origin in (list, set, Sequence):
-        oanno = list if not origin or origin is Sequence else origin
+        oanno = cast(Type[list], list if origin is Sequence else origin)
         # raise error if value does not match annotation
         if not is_sequence(value):
             raise _unexpected(name, anno, value, path)

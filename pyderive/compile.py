@@ -284,6 +284,7 @@ def gen_slots(cls: Type, fields: Fields) -> Tuple[str, ...]:
 
     :param cls:    class-object to assign slots onto
     :param fields: field structure to control slot definition
+    :return:       tuple of slots for dataclass
     """
     fields = list(_stdfields(fields))
     if '__slots__' in cls.__dict__:
@@ -294,7 +295,7 @@ def gen_slots(cls: Type, fields: Fields) -> Tuple[str, ...]:
     base_slots = {s for b in bases for s in getattr(b, '__slots__', [])}
     return tuple([s for s in slots if s not in base_slots])
 
-def add_slots(cls: Type, fields: Fields, frozen: bool = False) -> Type:
+def add_slots(cls: TypeT, fields: Fields, frozen: bool = False) -> TypeT:
     """
     attach slots for fields connected to the given class object
 

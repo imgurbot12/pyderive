@@ -5,7 +5,7 @@ PyDerive Extensions Tests
 #** Variables **#
 __all__ = [
     'SerdeTests',
-    'ValidationTests', 
+    'ValidationTests',
     'ValidationModelTests',
     'GenericValidationTests',
 ]

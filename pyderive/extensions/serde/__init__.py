@@ -39,6 +39,7 @@ __all__ = [
 #: global registry of supported serializer formats
 SERIALIZER_IMPL: Dict[str, Serializer] = {
     'json': JsonSerial,
+    'yml':  YamlSerial,
     'yaml': YamlSerial,
     'toml': TomlSerial,
     'xml':  XmlSerial,
@@ -47,6 +48,7 @@ SERIALIZER_IMPL: Dict[str, Serializer] = {
 #: global registry of supported deserializer formats
 DESERIALIZER_IMPL: Dict[str, Deserializer] = {
     'json': JsonDeserial,
+    'yml':  YamlDeserial,
     'yaml': YamlDeserial,
     'toml': TomlDeserial,
     'xml':  XmlDeserial,
@@ -257,6 +259,19 @@ class Serialize:
         """
         return self.serialize('xml', **kwargs)
 
+    def write_file(self, path: str, format: Optional[str] = None, **kwargs):
+        """
+        serialize and write contents to the specified filepath
+
+        :param path:   filepath to write to
+        :param format: serializer format to use
+        :param kwargs: additional configuration for serialization
+        """
+        format = format if format else path.rsplit('.', 1)[-1]
+        result = self.serialize(format, **kwargs)
+        with open(path, 'r') as f:
+            f.write(result)
+
 @dataclass_transform()
 class Deserialize:
     """Implement Deserialize Methods on Class Instance"""
@@ -322,6 +337,21 @@ class Deserialize:
         :return: decoded dataclass object
         """
         return cls.deserialize(toml, 'xml', **kwargs)
+
+    @classmethod
+    def read_file(cls,
+        path: str, format: Optional[str] = None, **kwargs) -> Self:
+        """
+        read and deserialize contents from the specified filepath
+
+        :param path:   filepath to read from
+        :param format: deserializer format to use
+        :param kwargs: additonal configuration for deserialization
+        :return:       decoded dataclass object
+        """
+        format = format if format else path.rsplit('.', 1)[-1]
+        with open(path, 'rb') as f:
+            return cls.deserialize(f.read(), format, **kwargs)
 
 @dataclass_transform()
 class Serde(Serialize, Deserialize):

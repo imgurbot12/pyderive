@@ -36,8 +36,8 @@ class ValidationTests(TestCase):
             b: str
             c: float
         _ = Foo(1, 'ok', 2.1)
-        foo3, foo4 = Foo('1', 7, 1), Foo(1, '7', 1.0)
-        foo5, foo6 = Foo(1.1, 2.1, '3.1'), Foo(1, '2.1', 3.1)
+        foo3, foo4 = Foo('1', 7, 1), Foo(1, '7', 1.0) #type: ignore
+        foo5, foo6 = Foo(1.1, 2.1, '3.1'), Foo(1, '2.1', 3.1) #type: ignore
         self.assertEqual(foo3, foo4)
         self.assertEqual(foo5, foo6)
 
@@ -63,10 +63,10 @@ class ValidationTests(TestCase):
         class Foo:
             a: List[int]
             b: Set[float]
-        foo1 = Foo([1, 2, 3], {1.1, 2.2, 3.3})
-        foo2 = Foo({1, 2, 3}, (1.1, 2.2, 3.3))
-        foo3 = Foo((1, 2, 3), [1.1, 2.2, 3.3])
-        foo4 = Foo([1.0, '2', 3], {1.1, 2.2, '3.3'})
+        foo1 = Foo([1, 2, 3], {1.1, 2.2, 3.3}) #type: ignore
+        foo2 = Foo({1, 2, 3}, (1.1, 2.2, 3.3)) #type: ignore
+        foo3 = Foo((1, 2, 3), [1.1, 2.2, 3.3]) #type: ignore
+        foo4 = Foo([1.0, '2', 3], {1.1, 2.2, '3.3'}) #type: ignore
         self.assertEqual(foo1, foo2)
         self.assertEqual(foo1, foo3)
         self.assertEqual(foo1, foo4)
@@ -94,7 +94,7 @@ class ValidationTests(TestCase):
             a: Tuple[int, float, str]
             b: Tuple[int, ...]
         foo1 = Foo((1, 1.2, 'ok'), (1, 2, 3, 4, 5))
-        foo2 = Foo([1.0, '1.2', 'ok'], [1, 2.0, '3', 4, 5])
+        foo2 = Foo([1.0, '1.2', 'ok'], [1, 2.0, '3', 4, 5]) #type: ignore
         self.assertEqual(foo1, foo2)
         self.assertRaises(FieldValidationError, Foo, (1, 1.2, ), (1, ))
         self.assertRaises(FieldValidationError, Foo, (1, 1.2, 'ok', 3), (1, ))
@@ -115,7 +115,7 @@ class ValidationTests(TestCase):
         class Foo:
             a: Union[int, str]
         foo1, foo2 = Foo(1), Foo('76')
-        foo3, foo4 = Foo(1.1), Foo(76)
+        foo3, foo4 = Foo(1.1), Foo(76) #type: ignore
         self.assertEqual(foo1, foo3)
         self.assertNotEqual(foo2, foo4)
 
@@ -142,8 +142,8 @@ class ValidationTests(TestCase):
         class Foo:
             a: E
         foo1, foo2 = Foo(E.A), Foo(E.B)
-        foo3, foo4 = Foo('A'), Foo('B')
-        foo5, foo6 = Foo('foo'), Foo('bar')
+        foo3, foo4 = Foo('A'), Foo('B') #type: ignore
+        foo5, foo6 = Foo('foo'), Foo('bar') #type: ignore
         self.assertEqual(foo1, foo3)
         self.assertEqual(foo1, foo5)
         self.assertEqual(foo2, foo4)
@@ -171,8 +171,8 @@ class ValidationModelTests(TestCase):
             b: str
             c: float
         _ = Foo(1, 'ok', 2.1)
-        foo3, foo4 = Foo('1', 7, 1), Foo(1, '7', 1.0)
-        foo5, foo6 = Foo(1.1, 2.1, '3.1'), Foo(1, '2.1', 3.1)
+        foo3, foo4 = Foo('1', 7, 1), Foo(1, '7', 1.0) #type: ignore
+        foo5, foo6 = Foo(1.1, 2.1, '3.1'), Foo(1, '2.1', 3.1) #type: ignore
         self.assertEqual(foo3, foo4)
         self.assertEqual(foo5, foo6)
 
@@ -182,7 +182,7 @@ class ValidationModelTests(TestCase):
             a: List[str]
         foo = Foo(['a', 'b', 'c'])
         foo.validate()
-        foo.a.extend(['d', 1])
+        foo.a.extend(['d', 1]) #type: ignore
         self.assertRaises(FieldValidationError, foo.validate)
 
     def test_model_parsing(self):
@@ -248,8 +248,8 @@ class GenericValidationTests(TestCase):
         self.assertRaises(FieldValidationError, Bar, '1')
         self.assertRaises(FieldValidationError, Bar, 1.0)
         self.assertEqual(Baz(1).value, 1)
-        self.assertEqual(Baz('1').value, 1)
-        self.assertEqual(Baz(1.0).value, 1)
+        self.assertEqual(Baz('1').value, 1) #type: ignore
+        self.assertEqual(Baz(1.0).value, 1) #type: ignore
 
     def test_typevars(self):
         """test more complex typevars with generics"""
