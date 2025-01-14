@@ -1,6 +1,11 @@
 pyderive
 ---------
 
+[![PyPI version](https://img.shields.io/pypi/v/pyderive3?style=for-the-badge)](https://pypi.org/project/pyderive3/)
+[![Python versions](https://img.shields.io/pypi/pyversions/pyderive3?style=for-the-badge)](https://pypi.org/project/pyderive3/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://github.com/imgurbot12/pyderive/blob/master/LICENSE)
+[![Made with Love](https://img.shields.io/badge/built%20with-%E2%99%A5-orange?style=for-the-badge)](https://github.com/imgurbot12/pyderive)
+
 Python3 Custom Dataclass Helpers
 
 ### Installation
