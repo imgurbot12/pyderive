@@ -66,7 +66,7 @@ class Bar(Serialize):
   a: int
   b: float
   c: bool
-  
+
 class Baz(Deserialize):
   a: int
   b: float
@@ -94,12 +94,12 @@ from typing import Type, TypeVar
 from pyderive.extensions.serde import *
 
 class CustomSerial(Serializer[str]):
-    
+
     @classmethod
     def serialize(cls, obj: Type, **options) -> str:
         objdict = to_dict(obj)
         return ','.join(f'{k}:{type(v).__name__}/{v}' for k,v in objdict.items())
-        
+
 T = TypeVar('T')
 
 class CustomDeserial(Deserializer[str]):

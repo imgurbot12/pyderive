@@ -200,6 +200,7 @@ Datetime = Annotated[Union[str, int, datetime], Validator[is_datetime]]
 Timedelta = Annotated[Union[str, int, timedelta], Validator[is_timedelta]]
 
 # register additional validators for common python types
+register_validator(bytes, is_bytes)
 register_validator(datetime, is_datetime)
 register_validator(timedelta, is_timedelta)
 register_validator(IO, is_io)
