@@ -190,8 +190,8 @@ def create_repr(fields: Fields, hide: Optional[ReprHide] = None) -> Callable:
     :param hide:   optional hide setting for repr
     :param return: repr-function
     """
-    body = ['f=[]']
-    for field in fields:
+    body   = ['f=[]']
+    for field in (f for f in _stdfields(fields) if f.repr):
         name   = field.name
         attr   = f'self.{name}'
         f_hide = field.metadata.get('hide') or hide
