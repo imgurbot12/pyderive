@@ -4,12 +4,13 @@ XML Serializer/Deserializer Utilities
 from abc import abstractmethod
 import importlib
 from typing import (
-    Any, Callable, Dict, Iterator, List, Mapping, Optional,
+    Any, Callable, Dict, ForwardRef, Iterator, List, Mapping, Optional,
     Protocol, Sequence, Set, Tuple, Type, Union, cast)
 from typing_extensions import get_origin, get_args
 
 from .serde import *
 from .serde import RENAME_ATTR, SUPPORTED_TYPES
+from ..utils import deref
 from ...dataclasses import is_dataclass, fields
 
 #** Variables **#
@@ -122,7 +123,7 @@ def _asxml_inner(
     # default
     else:
         elem = ElementFactory(name)
-        elem.text   = str(obj)
+        elem.text = str(obj)
         elem.attrib.update({'type': type(obj).__name__} if use_type else {})
         root.append(elem)
 
@@ -151,7 +152,8 @@ def from_xml(cls: Type[T],
             raise ValueError(f'{cls.__name__!r} Unexpected Tag: {elem.tag!r}')
         # assign xml according to field annotation
         field = fdict[elem.tag]
-        value = _fromxml_inner(pos, field.anno, elem, (allow_unused, use_attrs))
+        value = _fromxml_inner(cls,
+            pos, field.anno, elem, (allow_unused, use_attrs))
         if is_sequence(value) and not _is_namedtuple(value):
             kwargs.setdefault(field.name, [])
             kwargs[field.name].extend(value)
@@ -175,15 +177,22 @@ def from_xml(cls: Type[T],
             kwargs[key] = origin(value)
     return cls(**kwargs)
 
-def _fromxml_inner(pos: int, anno: Type, elem: 'Element', args: tuple) -> Any:
+def _fromxml_inner(
+    cls: Type, pos: int, anno: Any, elem: 'Element', args: tuple) -> Any:
     """
     parse the specified xml-element to match the given annotation
 
+    :param cls:  base dataclass object
     :param pos:  current index of element from parent
     :param anno: annotation to parse from element
     :param elem: element being parsed to match annotation
     :param args: additional arguments to pass to parsers
     """
+    # handle forward-ref
+    if isinstance(anno, str):
+        anno = ForwardRef(anno)
+    if isinstance(anno, ForwardRef):
+        anno = deref(cls, anno)
     # handle datacalss
     if is_dataclass(anno):
         return from_xml(anno, elem, *args)
@@ -194,33 +203,33 @@ def _fromxml_inner(pos: int, anno: Type, elem: 'Element', args: tuple) -> Any:
         result = {}
         for pos, (vanno, child) in enumerate(zip(vannos, elem), 0):
             key   = child.tag
-            value = _fromxml_inner(pos, vanno, child, args)
+            value = _fromxml_inner(cls, pos, vanno, child, args)
             result[key] = value
         return anno(**result)
     # handle defined unions
     origin = get_origin(anno)
     if origin is Union:
         for subanno in get_args(anno):
-            newval = _fromxml_inner(pos, subanno, elem, args)
+            newval = _fromxml_inner(cls, pos, subanno, elem, args)
             if newval != elem.text:
                 return newval
     # handle defined sequences
     elif origin in (list, set, Sequence):
         origin = cast(Type[list], list if origin is Sequence else origin)
         ianno  = get_args(anno)[0]
-        return origin([_fromxml_inner(pos, ianno, elem, args)])
+        return origin([_fromxml_inner(cls, pos, ianno, elem, args)])
     # handle defined tuples
     elif origin is tuple:
         iannos = get_args(anno)
         ianno = iannos[pos] if pos < len(iannos) else str
-        return (_fromxml_inner(pos, ianno, elem, args), )
+        return (_fromxml_inner(cls, pos, ianno, elem, args), )
     # handle defined dictionaries
     elif origin in (dict, Mapping):
         _, vanno = get_args(anno)
         result   = {}
         for pos, child in enumerate(elem, 0):
             key   = child.tag
-            value = _fromxml_inner(pos, vanno, child, args)
+            value = _fromxml_inner(cls, pos, vanno, child, args)
             result[key] = value
         return dict(result)
     # handle simple string conversion types

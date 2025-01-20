@@ -4,10 +4,11 @@ Serde Serialization/Deserialization Tools/Baseclasses
 import ipaddress
 from abc import abstractmethod
 from typing import (
-    Any, Callable, Dict, List, Mapping, Optional, Protocol,
+    Any, Callable, Dict, ForwardRef, List, Mapping, Optional, Protocol,
     Sequence, Set, Tuple, Type, TypeVar, Union, cast)
 from typing_extensions import runtime_checkable, get_origin, get_args
 
+from ..utils import deref
 from ... import BaseField
 from ...abc import MISSING, FieldDef, InitVar, has_default
 from ...dataclasses import FIELD_ATTR
@@ -178,6 +179,7 @@ def _unexpected(name: str, anno: Type, value: Any, path: List[str]):
         f'Field: {name!r} Expected: {anno!r}, Got: {type(value)!r}', path)
 
 def _parse_tuple(
+    cls:     Type,
     name:    str,
     anno:    Type,
     names:   Sequence[str],
@@ -206,14 +208,15 @@ def _parse_tuple(
     # parse values according
     result = []
     for n, (name, ianno, item) in enumerate(zip(names, args, value), 0):
-        item = _parse_object(name, ianno, item,
+        item = _parse_object(cls, name, ianno, item,
             decoder, [*path, str(n)], kwargs)
         result.append(item)
     return tuple(result)
 
 def _parse_object(
+    cls:     Type,
     name:    str,
-    anno:    Type,
+    anno:    Any,
     value:   Any,
     decoder: 'TypeDecoder',
     path:    List[str],
@@ -230,6 +233,11 @@ def _parse_object(
     :param kwargs:  additional kwargs to pass to recursive function
     :return:        parsed object value
     """
+    # dereference `ForwardRef`
+    if isinstance(anno, str):
+        anno = ForwardRef(anno)
+    if isinstance(anno, ForwardRef):
+        anno = deref(cls, anno)
     # handle dataclass parsing
     if is_dataclass(anno):
         if is_sequence(value):
@@ -239,8 +247,8 @@ def _parse_object(
     # handle named-tuples
     if anno_is_namedtuple(anno):
         names, args = namedtuple_annos(anno)
-        return _parse_tuple(name, anno, names, args,
-                    value, decoder, path, kwargs)
+        return _parse_tuple(cls,
+                name, anno, names, args, value, decoder, path, kwargs)
     # handle defined union tpes
     origin = get_origin(anno)
     if origin is Union:
@@ -251,7 +259,8 @@ def _parse_object(
             return value
         # attempt to convert it w/ parsing
         for subanno in args:
-            newval = _parse_object(name, subanno, value, decoder, path, kwargs)
+            newval = _parse_object(cls,
+                name, subanno, value, decoder, path, kwargs)
             if newval != value:
                 return newval
     # handle defined dictionary types
@@ -264,8 +273,8 @@ def _parse_object(
         kname, vname = f'{name}[key]', f'{name}[val]'
         kanno, vanno = get_args(anno)
         for k,v in value.items():
-            k = _parse_object(kname, kanno, k, decoder, path, kwargs)
-            v = _parse_object(vname, vanno, v, decoder, [*path, k], kwargs)
+            k = _parse_object(cls, kname, kanno, k, decoder, path, kwargs)
+            v = _parse_object(cls, vname, vanno, v, decoder, [*path, k], kwargs)
             result[k] = v
         return type(value)(result) # type: ignore
     # handle defined tuple sequences
@@ -273,8 +282,8 @@ def _parse_object(
         # raise error if value does not match annotation
         args  = get_args(anno)
         names = [f'{name}[{n}]' for n in range(0, len(args))]
-        return _parse_tuple(name, anno, names, args,
-            value, decoder, path, kwargs)
+        return _parse_tuple(cls,
+            name, anno, names, args, value, decoder, path, kwargs)
     # handle defined sequence types
     elif origin in (list, set, Sequence):
         oanno = cast(Type[list], list if origin is Sequence else origin)
@@ -285,8 +294,8 @@ def _parse_object(
         ianno  = get_args(anno)[0]
         result = []
         for n, item in enumerate(value, 0):
-            item = _parse_object(f'{name}[{n}]', ianno,
-                item, decoder, [*path, str(n)], kwargs)
+            item = _parse_object(cls,
+                f'{name}[{n}]', ianno, item, decoder, [*path, str(n)], kwargs)
             result.append(item)
         return oanno(result)
     # allow for custom decoding on arbritrary types
@@ -298,7 +307,9 @@ def _parse_object(
     return value
 
 def _has_skip(field: FieldDef) -> int:
-    """check if field has any skip attribute"""
+    """
+    check if field has any skip attribute
+    """
     if field.metadata.get(SKIP_ATTR, False):
         return -1
     for attr in (SKIP_DEFAULT_ATTR, SKIP_IF_ATTR, SKIP_IFFALSE_ATTR):
@@ -346,8 +357,8 @@ def from_sequence(
     # iterate values and try to match to annotations
     attrs = {}
     for field, value in zip(fields, values):
-        value = _parse_object(field.name, field.anno,
-            value, decoder, [*path, field.name], kwargs)
+        value = _parse_object(cls,
+            field.name, field.anno, value, decoder, [*path, field.name], kwargs)
         if not skip_field(field, value):
             attrs[field.name] = value
     # convert to object, preserve path in error
@@ -399,8 +410,8 @@ def from_mapping(
         name  = field.name
         if skip_field(field, value):
             continue
-        attrs[name] = _parse_object(name, field.anno,
-            value, decoder, [*path, key], kwargs)
+        attrs[name] = _parse_object(cls,
+            name, field.anno, value, decoder, [*path, key], kwargs)
     # convert to object, preserve path in error
     try:
         return cls(**attrs)
@@ -430,7 +441,9 @@ def from_object(cls: Type[T],
     raise TypeError(f'Cannot deconstruct: {value!r}')
 
 def _dict_factory(cls, items: List[Tuple[str, Any]]) -> dict:
-    """generate custom dictionary-factory"""
+    """
+    generate custom dictionary-factory
+    """
     fdict  = {f.name:f for f in fields(cls)}
     output = {}
     for name, value in items:
@@ -442,7 +455,9 @@ def _dict_factory(cls, items: List[Tuple[str, Any]]) -> dict:
     return output
 
 def _tuple_factory(cls, items: List[Any]) -> tuple:
-    """generate custom tuple-factory"""
+    """
+    generate custom tuple-factory
+    """
     output    = []
     fielddefs = fields(cls)
     for field, item in zip(fielddefs, items):
@@ -484,11 +499,15 @@ class PathError(Protocol):
     path: List[str]
 
 class SerdeError(ValueError):
-    """Custom ValueError Exception"""
+    """
+    Custom ValueError Exception
+    """
     pass
 
 class SerdeParseError(ValueError, PathError):
-    """Custom Conversion Exception"""
+    """
+    Custom Conversion Exception
+    """
 
     def __init__(self, message: str, path: List[str]):
         self.message = message
@@ -503,12 +522,16 @@ class UnknownField(SerdeParseError):
 
 @dataclass(slots=True)
 class SerdeParams:
-    """serde configuration parameters"""
+    """
+    Serde configuration parameters
+    """
     bases: Set[Type] = field(default_factory=set)
 
 @dataclass
 class SerdeField(BaseField):
-    """serde dataclass field definition"""
+    """
+    Serde dataclass field definition
+    """
     rename:       InitVar[Optional[str]]       = None
     aliases:      InitVar[Optional[List[str]]] = None
     skip:         InitVar[bool]                = False
@@ -528,7 +551,9 @@ class SerdeField(BaseField):
         })
 
 class TypeEncoder:
-    """Object Type Encoder"""
+    """
+    Object Type Encoder
+    """
 
     def default(self, obj: Any) -> Any:
         """handle common python types"""
@@ -539,7 +564,9 @@ class TypeEncoder:
         return obj
 
 class TypeDecoder:
-    """Object Type Decoder"""
+    """
+    Object Type Decoder
+    """
 
     def default(self, anno: Type, obj: Any) -> Any:
         """handle common python types"""
@@ -548,7 +575,9 @@ class TypeDecoder:
         return obj
 
 class Serializer(Protocol[S]):
-    """Serializer Interface Definition"""
+    """
+    Serializer Interface Definition
+    """
 
     @classmethod
     @abstractmethod

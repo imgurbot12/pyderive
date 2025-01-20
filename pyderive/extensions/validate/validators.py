@@ -12,6 +12,7 @@ from typing import (
 from typing_extensions import Annotated, runtime_checkable, get_origin, get_args
 
 from ..serde import is_sequence
+from ..utils import deref
 from ...abc import MISSING, FieldDef, FieldValidator
 from ...compat import is_stddataclass
 from ...dataclasses import is_dataclass, asdict
@@ -410,18 +411,13 @@ def ref_validator(cls: Type, ref: ForwardRef, typecast: bool) -> TypeValidator:
     """
     # generate dereference function w/ cache to avoid repeat lookups
     @functools.lru_cache(maxsize=None)
-    def deref() -> TypeValidator:
-        # deref annotation
-        module   = getattr(cls, '__module__')
-        nglobals = getattr(sys.modules.get(module, None), '__dict__', {})
-        nlocals  = dict(vars(cls))
-        anno     = typing._eval_type(ref, nglobals, nlocals) #type: ignore
-        # generate validator
+    def deref_validator() -> TypeValidator:
+        anno = deref(cls, ref)
         return type_validator(anno, typecast)
     # generate validator
     @_wrap(ref.__forward_arg__)
     def validator(value: Any) -> Any:
-        return deref()(value)
+        return deref_validator()(value)
     return validator
 
 def identity(value: Any) -> Any:

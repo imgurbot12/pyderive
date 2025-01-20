@@ -14,10 +14,14 @@ __all__ = ['ValidationTests', 'ValidationModelTests', 'GenericValidationTests']
 #** Classes **#
 
 class ValidationTests(TestCase):
-    """Validation Decorator UnitTests"""
+    """
+    Validation Decorator UnitTests
+    """
 
     def test_simple(self):
-        """ensure simple validations work properly"""
+        """
+        ensure simple validations work properly
+        """
         @validate
         class Foo:
             a: int
@@ -29,7 +33,9 @@ class ValidationTests(TestCase):
         self.assertRaises(FieldValidationError, Foo, 9, 'c', 10)
 
     def test_typecast_simple(self):
-        """ensure simple typecasting works"""
+        """
+        ensure simple typecasting works
+        """
         @validate(typecast=True)
         class Foo:
             a: int
@@ -42,7 +48,9 @@ class ValidationTests(TestCase):
         self.assertEqual(foo5, foo6)
 
     def test_sequence(self):
-        """ensure sequence validation works properly"""
+        """
+        ensure sequence validation works properly
+        """
         @validate
         class Foo:
             a: List[int]
@@ -58,7 +66,9 @@ class ValidationTests(TestCase):
         self.assertRaises(FieldValidationError, Foo, [1, 2, 3], {'1.1', 2.2, 3.3})
 
     def test_typecast_sequence(self):
-        """ensure sequence typecasting works"""
+        """
+        ensure sequence typecasting works
+        """
         @validate(typecast=True)
         class Foo:
             a: List[int]
@@ -72,7 +82,9 @@ class ValidationTests(TestCase):
         self.assertEqual(foo1, foo4)
 
     def test_tuple(self):
-        """ensure tuple validation works properly"""
+        """
+        ensure tuple validation works properly
+        """
         @validate
         class Foo:
             a: Tuple[int, float, str]
@@ -88,7 +100,9 @@ class ValidationTests(TestCase):
         self.assertRaises(FieldValidationError, Foo, (1, 1.2, 'ok'), (1, 'ok', ))
 
     def test_typecast_tuple(self):
-        """ensure tuple typecasting works properly"""
+        """
+        ensure tuple typecasting works properly
+        """
         @validate(typecast=True)
         class Foo:
             a: Tuple[int, float, str]
@@ -100,7 +114,9 @@ class ValidationTests(TestCase):
         self.assertRaises(FieldValidationError, Foo, (1, 1.2, 'ok', 3), (1, ))
 
     def test_union(self):
-        """ensure union validation works properly"""
+        """
+        ensure union validation works properly
+        """
         @validate
         class Foo:
             a: Union[int, str]
@@ -110,7 +126,9 @@ class ValidationTests(TestCase):
         self.assertRaises(FieldValidationError, Foo, object())
 
     def test_typecast_union(self):
-        """ensure union typecasting works properly"""
+        """
+        ensure union typecasting works properly
+        """
         @validate(typecast=True)
         class Foo:
             a: Union[int, str]
@@ -120,7 +138,9 @@ class ValidationTests(TestCase):
         self.assertNotEqual(foo2, foo4)
 
     def test_enum(self):
-        """ensure enum validation works properly"""
+        """
+        ensure enum validation works properly
+        """
         class E(Enum):
             A = 'foo'
             B = 'bar'
@@ -134,7 +154,9 @@ class ValidationTests(TestCase):
         self.assertRaises(FieldValidationError, Foo, 'bar')
 
     def test_typecast_enum(self):
-        """ensure enum typecasting works properly"""
+        """
+        ensure enum typecasting works properly
+        """
         class E(Enum):
             A = 'foo'
             B = 'bar'
@@ -151,10 +173,14 @@ class ValidationTests(TestCase):
         self.assertRaises(FieldValidationError, Foo, 'asdf')
 
 class ValidationModelTests(TestCase):
-    """Validator BaseModel UnitTests"""
+    """
+    Validator BaseModel UnitTests
+    """
 
     def test_model(self):
-        """validate `BaseModel` generates validator dataclass"""
+        """
+        validate `BaseModel` generates validator dataclass
+        """
         class Foo(BaseModel):
             a: int
             b: str
@@ -165,7 +191,9 @@ class ValidationModelTests(TestCase):
         self.assertRaises(FieldValidationError, Foo, 9, 'c', 10)
 
     def test_model_typecast(self):
-        """validate `BaseModel` can typecast values"""
+        """
+        validate `BaseModel` can typecast values
+        """
         class Foo(BaseModel, typecast=True):
             a: int
             b: str
@@ -177,7 +205,9 @@ class ValidationModelTests(TestCase):
         self.assertEqual(foo5, foo6)
 
     def test_model_validate(self):
-        """ensure `BaseModel.validate` function works as intended"""
+        """
+        ensure `BaseModel.validate` function works as intended
+        """
         class Foo(BaseModel):
             a: List[str]
         foo = Foo(['a', 'b', 'c'])
@@ -186,7 +216,9 @@ class ValidationModelTests(TestCase):
         self.assertRaises(FieldValidationError, foo.validate)
 
     def test_model_parsing(self):
-        """ensure `BaseModel.parse_obj` function works as intended"""
+        """
+        ensure `BaseModel.parse_obj` function works as intended
+        """
         class Bar(BaseModel):
             x: Union[float, str]
         class Foo(BaseModel):
@@ -198,7 +230,9 @@ class ValidationModelTests(TestCase):
         self.assertRaises(FieldValidationError, Foo.parse_obj, {'a': (1.0, 'ok', 2.1), 'bar': {'x': 'ok'}})
 
     def test_model_complex(self):
-        """ensure `BaseModel`.valdiate function works on complex objects"""
+        """
+        ensure `BaseModel`.valdiate function works on complex objects
+        """
         class Bar(BaseModel):
             i: Tuple[str, int, float]
         class Foo(BaseModel):
@@ -217,7 +251,9 @@ class ValidationModelTests(TestCase):
         self.assertRaises(FieldValidationError, Foo.parse_obj, foo5)
 
     def test_model_subclass(self):
-        """test `BaseModel` inherritance of another dataclass"""
+        """
+        test `BaseModel` inherritance of another dataclass
+        """
         @dataclass
         class Bar:
             x: int
@@ -230,10 +266,14 @@ class ValidationModelTests(TestCase):
         self.assertRaises(FieldValidationError, Foo, 1, 2)
 
 class GenericValidationTests(TestCase):
-    """Validation for Generics UnitTests"""
+    """
+    Validation for Generics UnitTests
+    """
 
     def test_simple(self):
-        """test simple generics assignemnt"""
+        """
+        test simple generics assignemnt
+        """
         T = TypeVar('T')
         class Foo(BaseModel, Generic[T]):
             value: T
@@ -252,7 +292,9 @@ class GenericValidationTests(TestCase):
         self.assertEqual(Baz(1.0).value, 1) #type: ignore
 
     def test_typevars(self):
-        """test more complex typevars with generics"""
+        """
+        test more complex typevars with generics
+        """
         T = TypeVar('T', bound=Union[int, float, bool])
         class Foo(BaseModel, Generic[T]):
             a: T
@@ -273,7 +315,9 @@ class GenericValidationTests(TestCase):
         self.assertRaises(FieldValidationError, Bar, 1.0, [2], ('a', 3))
 
     def test_complex(self):
-        """test complex generic setup w/ heigharchy of validators"""
+        """
+        test complex generic setup w/ heigharchy of validators
+        """
         T = TypeVar('T', bound=Union[int, float, bool])
         class Foo(BaseModel, Generic[T]):
             x: T

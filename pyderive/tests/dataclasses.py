@@ -13,44 +13,64 @@ __all__ = ['DataClassTests']
 #** Classes **#
 
 class DataClassTests(unittest.TestCase):
+    """
+    PyDerive Dataclass UnitTests
+    """
 
     def test_repr_standard(self):
-        """ensure standard repr works as intended"""
+        """
+        ensure standard repr works as intended
+        """
         @dataclass
         class Foo:
             a: int
             b: bool
             c: Optional[str] = None
+            d: InitVar[str] = 'd'
+            e: ClassVar[str] = 'e'
+            f: str = field(repr=False, default='f')
         name = Foo.__qualname__
         foo1 = Foo(0, False, None)
         self.assertEqual(repr(foo1), f'{name}(a=0, b=False, c=None)')
 
     def test_repr_hidden_null(self):
-        """ensure repr (hidden on null) works as intended"""
+        """
+        ensure repr (hidden on null) works as intended
+        """
         @dataclass(hide_repr='null')
         class Foo:
             a: Optional[str]
             b: int
             c: List[str]
             d: bool
+            e: InitVar[str] = 'e'
+            f: ClassVar[str] = 'f'
+            g: str = field(repr=False, default='g')
         name = Foo.__qualname__
         foo1 = Foo(None, 0, [], False)
         self.assertEqual(repr(foo1), f'{name}(b=0, c=[], d=False)')
 
     def test_repr_empty(self):
-        """ensure repr (hidden on empty) works as intended"""
+        """
+        ensure repr (hidden on empty) works as intended
+        """
         @dataclass(hide_repr='empty')
         class Foo:
             a: Optional[str]
             b: int
             c: List[str]
             d: bool
+            e: InitVar[str] = 'e'
+            f: ClassVar[str] = 'f'
+            g: str = field(repr=False, default='g')
         name = Foo.__qualname__
         foo1 = Foo(None, 0, [], False)
         self.assertEqual(repr(foo1), f'{name}(b=0, d=False)')
 
     def test_initvar(self):
-        """ensure InitVar works as intended"""
+        """
+        ensure InitVar works as intended
+        """
         @dataclass
         class T:
             a: int
@@ -65,7 +85,9 @@ class DataClassTests(unittest.TestCase):
         self.assertEqual(t.extra, 2)
 
     def test_classvar(self):
-        """ensure ClassVar works as intended"""
+        """
+        ensure ClassVar works as intended
+        """
         @dataclass
         class T:
             a: ClassVar[int] = 0
@@ -75,7 +97,9 @@ class DataClassTests(unittest.TestCase):
         self.assertNotIn('a', [f.name for f in fields(t)])
 
     def test_compat(self):
-        """validate backwards compatability w/ stdlib dataclasses"""
+        """
+        validate backwards compatability w/ stdlib dataclasses
+        """
         @dataclasses.dataclass
         class Foo:
             a: int
@@ -97,7 +121,9 @@ class DataClassTests(unittest.TestCase):
         self.assertTrue(len(dataclasses.fields(Bar)) == 3)
 
     def test_frozen(self):
-        """validate frozen attribute works"""
+        """
+        validate frozen attribute works
+        """
         @dataclass
         class Foo:
             a: int = 0
@@ -109,7 +135,9 @@ class DataClassTests(unittest.TestCase):
         self.assertRaises(FrozenInstanceError, bar.__setattr__, 'b', 4)
 
     def test_frozen_inherit(self):
-        """ensure frozen inherrit fails when baseclass not frozen"""
+        """
+        ensure frozen inherrit fails when baseclass not frozen
+        """
         @dataclass
         class Foo:
             a: int = 0
@@ -118,10 +146,14 @@ class DataClassTests(unittest.TestCase):
         self.assertRaises(TypeError, dataclass, Bar, frozen=True)
 
     def test_asdict(self):
-        """ensure asdict function as intended"""
+        """
+        ensure asdict function as intended
+        """
         @dataclass
         class Foo:
             a: int = 0
+            b: InitVar[int] = 1
+            c: ClassVar[int] = 2
         @dataclass
         class Bar:
             foo: Foo
@@ -131,10 +163,14 @@ class DataClassTests(unittest.TestCase):
         self.assertDictEqual(asdict(b), {'foo': {'a': 1}, 'b': 2, 'c': []})
 
     def test_astuple(self):
-        """ensure astuple function as intended"""
+        """
+        ensure astuple function as intended
+        """
         @dataclass
         class Foo:
             a: int = 0
+            b: InitVar[int] = 1
+            c: ClassVar[int] = 2
         @dataclass
         class Bar:
             foo: Foo
@@ -146,7 +182,9 @@ class DataClassTests(unittest.TestCase):
         self.assertListEqual(list(tup), [(1, ), 2, []])
 
     def test_slots(self):
-        """ensure slots generation works as intended"""
+        """
+        ensure slots generation works as intended
+        """
         @dataclass(slots=True)
         class Foo:
             a: int

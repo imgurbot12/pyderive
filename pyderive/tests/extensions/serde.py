@@ -12,25 +12,35 @@ __all__ = ['SerdeTests']
 #** Classes **#
 
 class SerdeTests(TestCase):
-    """Serde Serialization UnitTests"""
+    """
+    Serde Serialization UnitTests
+    """
 
     def assertDict(self, s: Any, v: Dict):
-        """assert serialization/deserialization for dict works as intended"""
+        """
+        assert serialization/deserialization for dict works as intended
+        """
         self.assertEqual(to_dict(s), v)
         self.assertEqual(from_object(s.__class__, v), s)
 
     def assertTuple(self, s: Any, v: Tuple):
-        """assert serialization/deserialization for tuple works as intended"""
+        """
+        assert serialization/deserialization for tuple works as intended
+        """
         self.assertEqual(to_tuple(s), v)
         self.assertEqual(from_object(s.__class__, v), s)
 
     def assertSerial(self, serde: Any, format: str, value: str):
-        """assert serialization/deserialization for value works as intended"""
+        """
+        assert serialization/deserialization for value works as intended
+        """
         self.assertEqual(serialize(serde, format), value)
         self.assertEqual(deserialize(serde.__class__, value, format), serde)
 
     def test_toobject(self):
-        """ensure basic `to_dict` and `to_tuple` works as intended"""
+        """
+        ensure basic `to_dict` and `to_tuple` works as intended
+        """
         @serde
         class Bar:
             x: int = 3
@@ -45,7 +55,9 @@ class SerdeTests(TestCase):
         self.assertTuple(foo, (1, 'text', (3, 4)))
 
     def test_serialize(self):
-        """ensure basic `serialize` functions works as intended"""
+        """
+        ensure basic `serialize` functions works as intended
+        """
         @serde
         class Foo:
             a: int
@@ -57,7 +69,9 @@ class SerdeTests(TestCase):
         self.assertSerial(foo, 'xml', "<Foo><a>1</a><b>text</b></Foo>")
 
     def test_serialize_complex(self):
-        """ensure more complex serialization functions work as intended"""
+        """
+        ensure more complex serialization functions work as intended
+        """
         class Bar(Serde):
             plot:  Dict[str, int]
             scale: List[float]
@@ -84,8 +98,32 @@ class SerdeTests(TestCase):
         self.assertEqual(Foo.from_yaml(fooy), foo)
         self.assertEqual(Foo.from_xml(foox), foo)
 
+    def test_forward_ref(self):
+        """
+        ensure `ForwardRef` can serialize/deserialize properly
+        """
+        global Bar
+        class Foo(Serde):
+            foo: int
+            bar: 'Bar'
+        class Bar(Serde):
+            baz: int
+        foo  = Foo(1, Bar(2))
+        dfoo = foo.asdict()
+        tfoo = foo.astuple()
+        fooj = foo.to_json()
+        fooy = foo.to_yaml()
+        foox = foo.to_xml()
+        self.assertEqual(Foo.from_object(dfoo), foo)
+        self.assertEqual(Foo.from_object(tfoo), foo)
+        self.assertEqual(Foo.from_json(fooj), foo)
+        self.assertEqual(Foo.from_yaml(fooy), foo)
+        self.assertEqual(Foo.from_xml(foox), foo)
+
     def test_rename(self):
-        """ensure `rename` field option works as intended"""
+        """
+        ensure `rename` field option works as intended
+        """
         class Foo(Serialize):
             a: int = field(rename='b')
             c: str = 'text'
@@ -94,7 +132,9 @@ class SerdeTests(TestCase):
         self.assertTuple(foo, (10, 'text'))
 
     def test_skip(self):
-        """ensure `skip` field option works as intended"""
+        """
+        ensure `skip` field option works as intended
+        """
         class Foo:
             a: int = field(skip=True)
         class Bar(Serialize):
@@ -107,7 +147,9 @@ class SerdeTests(TestCase):
         self.assertTuple(bar, (77, 1.1))
 
     def test_skip_if(self):
-        """ensure `skip_if` field option works as intended"""
+        """
+        ensure `skip_if` field option works as intended
+        """
         class Foo:
             a: int = field(skip_if=lambda a: a == 1)
         class Bar(Serialize):
@@ -128,7 +170,9 @@ class SerdeTests(TestCase):
         self.assertEqual(from_object(Bar, ('text', 1.1)), bar)
 
     def test_skip_if_not(self):
-        """ensure `skip_if_not` field option works as intended"""
+        """
+        ensure `skip_if_not` field option works as intended
+        """
         class Foo:
             a: int = field(skip_if_not=True)
         class Bar(Serialize):
@@ -148,7 +192,9 @@ class SerdeTests(TestCase):
         self.assertEqual(from_object(Bar, (0, 'text', 0)), bar)
 
     def test_skip_default(self):
-        """ensure `skip_default` field option works as intended"""
+        """
+        ensure `skip_default` field option works as intended
+        """
         class Foo:
             a: int = field(skip_default=True)
         class Bar(Serialize):
