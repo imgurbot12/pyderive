@@ -230,3 +230,18 @@ class SerdeTests(TestCase):
         bar = Bar('ok', 11, ['a', 'b'])
         self.assertDict(bar, {'a': 'ok', 'b': 11, 'c': ['a', 'b']})
         self.assertTuple(bar, ('ok', 11, ['a', 'b']))
+
+    def test_union(self):
+        """
+        ensure union is properly encoded/decoded
+        """
+        class A(Serde):
+            a: int
+        class B(Serde):
+            b: int
+        class Foo(Serde):
+            foo: List[Union[A, B]]
+        foo    = Foo([A(1), B(2)])
+        result = foo.asdict()
+        foo2   = Foo.from_object(result)
+        self.assertEqual(foo, foo2)

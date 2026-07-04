@@ -260,10 +260,13 @@ def _parse_object(
             return value
         # attempt to convert it w/ parsing
         for subanno in args:
-            newval = _parse_object(cls,
-                name, subanno, value, decoder, path, kwargs)
-            if newval != value:
-                return newval
+            try:
+                newval = _parse_object(cls,
+                    name, subanno, value, decoder, path, kwargs)
+                if newval != value:
+                    return newval
+            except UnknownField:
+                pass
     # handle defined dictionary types
     elif origin in (dict, Mapping):
         # raise error if value does not match annotation
