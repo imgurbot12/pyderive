@@ -320,6 +320,8 @@ def union_validator(anno: Type,
     annotations = []
     while wrapped:
         sanno = wrapped.pop()
+        if isinstance(sanno, ForwardRef):
+            continue
         origin, subargs = get_origin(sanno), get_args(sanno)
         if origin is None:
             annotations.append(sanno)

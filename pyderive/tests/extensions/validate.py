@@ -13,6 +13,15 @@ __all__ = ['ValidationTests', 'ValidationModelTests', 'GenericValidationTests']
 
 #** Classes **#
 
+ABRef = Union['A', 'B']
+
+@validate
+class A:
+    a: int
+@validate
+class B:
+    b: int
+
 class ValidationTests(TestCase):
     """
     Validation Decorator UnitTests
@@ -136,6 +145,16 @@ class ValidationTests(TestCase):
         foo3, foo4 = Foo(1.1), Foo(76) #type: ignore
         self.assertEqual(foo1, foo3)
         self.assertNotEqual(foo2, foo4)
+
+    def test_ref_union(self):
+        """
+        ensure validation on forward-ref union works as intended
+        """
+        @validate
+        class Foo:
+            items: List[ABRef]
+        foo1 = Foo([A(1), B(2)])
+        self.assertRaises(FieldValidationError, Foo, [A(1), 1])
 
     def test_enum(self):
         """
