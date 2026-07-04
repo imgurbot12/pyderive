@@ -291,6 +291,21 @@ class GenericValidationTests(TestCase):
         self.assertEqual(Baz('1').value, 1) #type: ignore
         self.assertEqual(Baz(1.0).value, 1) #type: ignore
 
+    def test_inherritance(self):
+        """
+        test arg order is not broken in inherritance
+        """
+        class Foo(BaseModel):
+            foo: int
+        class Bar(Foo):
+            bar: str
+        bar = Bar(1, 'a')
+        self.assertEqual(bar.foo, 1)
+        self.assertEqual(bar.bar, 'a')
+        self.assertRaises(FieldValidationError, Bar, 1)
+        self.assertRaises(FieldValidationError, Bar, 'a')
+        self.assertRaises(FieldValidationError, Bar, bar='a')
+
     def test_typevars(self):
         """
         test more complex typevars with generics
@@ -318,16 +333,20 @@ class GenericValidationTests(TestCase):
         """
         test complex generic setup w/ heigharchy of validators
         """
-        T = TypeVar('T', bound=Union[int, float, bool])
+        T  = TypeVar('T', bound=Union[int, float, bool])
+        T2 = TypeVar('T2')
         class Foo(BaseModel, Generic[T]):
             x: T
-        class Bar(BaseModel, Generic[T]):
+        class Bar(BaseModel, Generic[T, T2]):
             a:   T
             foo: Foo[T]
-        class Baz(Bar[int]):
+            bar: T2
+        class Baz(Bar[int, str]):
             pass
-        bar = Bar(1, Foo(2.0))
+        bar = Bar(1, Foo(2.0), 3)
         self.assertEqual(bar.a, 1)
         self.assertEqual(bar.foo.x, 2.0)
-        self.assertRaises(FieldValidationError, Baz, 'a', Foo(1))
-        self.assertRaises(FieldValidationError, Baz, 1, Foo(2.0))
+        self.assertEqual(bar.bar, 3)
+        self.assertRaises(FieldValidationError, Baz, 'a', Foo(1), 'a')
+        self.assertRaises(FieldValidationError, Baz, 1, Foo(2.0), 'b')
+        self.assertRaises(FieldValidationError, Baz, 1, Foo(1), 3)

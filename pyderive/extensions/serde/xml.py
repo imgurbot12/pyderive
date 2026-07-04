@@ -1,8 +1,9 @@
 """
 XML Serializer/Deserializer Utilities
 """
-from abc import abstractmethod
+import sys
 import importlib
+from abc import abstractmethod
 from typing import (
     Any, Callable, Dict, ForwardRef, Iterator, List, Mapping, Optional,
     Protocol, Sequence, Set, Tuple, Type, Union, cast)
@@ -248,9 +249,15 @@ def to_string(cls, xml_declaration: Optional[str] = '', **kwargs) -> str:
     :param kwargs: additional arguments to pass to xml builder
     :return:       xml string equivalent
     """
+    if sys.version_info.major == 3 \
+        and sys.version_info.minor == 8 \
+        and xml_declaration == '':
+        xml_declaration = ' '
+
     root   = to_xml(cls, **kwargs)
     string = ToString(root, xml_declaration=xml_declaration)
-    return string.decode() if isinstance(string, bytes) else string
+    text   = string.decode() if isinstance(string, bytes) else string
+    return text.lstrip()
 
 def from_string(cls: Type[T], xml: str, **kwargs) -> T:
     """

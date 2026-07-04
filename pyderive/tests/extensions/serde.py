@@ -1,6 +1,8 @@
 """
 PyDerive Validation Extension UnitTests
 """
+from datetime import date, datetime
+from ipaddress import IPv4Address, IPv6Address
 from typing import Any, Dict, List, NamedTuple, Tuple, Union
 from unittest import TestCase
 
@@ -53,6 +55,26 @@ class SerdeTests(TestCase):
         foo = Foo()
         self.assertDict(foo, {'a': 1, 'b': 'text', 'bar': {'x': 3, 'y': 4}})
         self.assertTuple(foo, (1, 'text', (3, 4)))
+
+    def test_typeconv(self):
+        """
+        ensure type converstion for supported python types
+        """
+        today = date.today()
+        now   = datetime.now()
+        ipv4  = IPv4Address('127.0.0.1')
+        ipv6  = IPv6Address('::1')
+
+        @serde
+        class Foo:
+            a: date        = today
+            b: datetime    = now
+            c: IPv4Address = ipv4
+            d: IPv6Address = ipv6
+        foo = Foo()
+        self.assertDict(foo, {
+            'a': today.isoformat(), 'b': now.isoformat(),
+            'c': str(ipv4), 'd': str(ipv6)})
 
     def test_serialize(self):
         """

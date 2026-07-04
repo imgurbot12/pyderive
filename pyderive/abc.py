@@ -19,6 +19,7 @@ __all__ = [
     'TypeT',
     'DataFunc',
 
+    'missing_factory',
     'has_default',
 
     'MISSING',
@@ -69,9 +70,15 @@ ReprHide = Union[Literal['null'], Literal['empty']]
 
 #** Functions **#
 
+def missing_factory() -> Type[MISSING]:
+    """known factory for returning missing value"""
+    return MISSING
+
 def has_default(field: 'FieldDef') -> bool:
     """return true if field has default"""
-    return field.default is not MISSING or field.default_factory is not MISSING
+    return field.default is not MISSING or (
+        field.default_factory is not MISSING
+        and field.default_factory is not missing_factory)
 
 def get_initvar(anno: Type) -> Optional[Type]:
     """return inner annotation if annotation is init-var"""

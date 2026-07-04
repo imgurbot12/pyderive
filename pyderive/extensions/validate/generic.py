@@ -190,9 +190,12 @@ def generic_getitem(cls: T, args: Tuple[Type, ...]) -> T:
     builtin = find_generics(cls)
     if builtin == params:
         return cls
+    # get original getitem function
+    func = getattr(typing, '_generic_class_getitem', None) \
+        or getattr(Generic, '__class_getitem__')
+    func = getattr(func, '__wrapped__')
     # generate new class from generic-alias
-    func   = Generic.__class_getitem__.__wrapped__ #type: ignore
-    alias  = func(cls=cls, params=args)
+    alias  = func(cls, args)
     newcls = types.new_class(str(alias).split('.', 1)[-1], (alias, ))
     # update field annotations based on generics and update validators
     update_generics(newcls)

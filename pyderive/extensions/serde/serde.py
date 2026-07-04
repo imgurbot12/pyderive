@@ -3,6 +3,7 @@ Serde Serialization/Deserialization Tools/Baseclasses
 """
 import ipaddress
 from abc import abstractmethod
+from datetime import date, datetime
 from typing import (
     Any, Callable, Dict, ForwardRef, List, Mapping, Optional, Protocol,
     Sequence, Set, Tuple, Type, TypeVar, Union, cast)
@@ -561,6 +562,8 @@ class TypeEncoder:
             return type(obj)([self.default(v) for v in obj])
         if isinstance(obj, (ipaddress.IPv4Address, ipaddress.IPv6Address)):
             return str(obj)
+        if isinstance(obj, (date, datetime)):
+            return obj.isoformat()
         return obj
 
 class TypeDecoder:
@@ -570,8 +573,10 @@ class TypeDecoder:
 
     def default(self, anno: Type, obj: Any) -> Any:
         """handle common python types"""
-        if isinstance(anno, (ipaddress.IPv4Address, ipaddress.IPv6Address)):
-            return ipaddress.ip_address(anno)
+        if anno in (ipaddress.IPv4Address, ipaddress.IPv6Address):
+            return ipaddress.ip_address(obj)
+        if anno in (date, datetime):
+            return anno.fromisoformat(obj)
         return obj
 
 class Serializer(Protocol[S]):
