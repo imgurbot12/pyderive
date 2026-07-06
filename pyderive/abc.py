@@ -70,7 +70,7 @@ ReprHide = Union[Literal['null'], Literal['empty']]
 
 #** Functions **#
 
-def missing_factory() -> Type[MISSING]:
+def missing_factory() -> Type['MISSING']:
     """known factory for returning missing value"""
     return MISSING
 
